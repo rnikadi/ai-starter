@@ -180,24 +180,24 @@ logs.
 
 Important variables include:
 
-  -----------------------------------------------------------------------------
-  Variable                      Purpose
-  ----------------------------- -----------------------------------------------
-  `ARCHESTRA_BASE_URL`          Archestra OpenAI-compatible endpoint; local
-                                examples use `http://localhost:9000/v1`
+  --------------------------------------------------------------------------
+  Variable                   Purpose
+  -------------------------- -----------------------------------------------
+  `ARCHESTRA_BASE_URL`       Archestra OpenAI-compatible endpoint; local
+                             examples use `http://localhost:9000/v1`
 
-  `ARCHESTRA_VIRTUAL_KEY`       Virtual key configured in Archestra
+  `ARCHESTRA_VIRTUAL_KEY`    Virtual key configured in Archestra
 
-  `ARCHESTRA_MODEL`             Model identifier available through Archestra
+  `ARCHESTRA_MODEL`          Model identifier available through Archestra
 
-  `AUTH_KEYCLOAK_ID`            OIDC client ID; expected `ai-starter-kit-web`
+  `AUTH_KEYCLOAK_ID`         OIDC client ID; expected `ai-starter-kit-web`
 
-  `AUTH_KEYCLOAK_ISSUER`        Expected
-                                `http://localhost:8080/realms/ai-starter-kit`
+  `AUTH_KEYCLOAK_ISSUER`     Expected
+                             `http://localhost:8080/realms/ai-starter-kit`
 
-  `AUTH_KEYCLOAK_SECRET`        Must match the confidential client secret in
-                                `keycloak/realm-export.json`
-  -----------------------------------------------------------------------------
+  `AUTH_KEYCLOAK_SECRET`     Must match the confidential client secret in
+                             `keycloak/realm-export.json`
+  --------------------------------------------------------------------------
 
 Use a model identifier and virtual key that are valid in your Archestra
 configuration. Do not expose these values to browser-side code or
@@ -448,58 +448,59 @@ interchangeable.
 
 ### 8.1 Credentials overview
 
-  -------------------------------------------------------------------------------------------------------------------------
-  Service / account Username or identifier          Password / secret source        Where to update it
-  ----------------- ------------------------------- ------------------------------- ---------------------------------------
-  Keycloak          Value of                        Value of                        Edit `.env.keycloak` for a **fresh**
-  bootstrap         `KC_BOOTSTRAP_ADMIN_USERNAME`   `KC_BOOTSTRAP_ADMIN_PASSWORD`   Keycloak data store. For an
-  administrator     (the setup script initially     in local `.env.keycloak`;       already-initialized realm, change the
-                    uses `admin`)                   `setupscripts.sh` generates a   administrator password through
-                                                    random password when it creates Keycloak's administration UI or
-                                                    this file                       supported account-recovery procedure;
-                                                                                    editing the environment file alone does
-                                                                                    not reset it
+  ------------------------------------------------------------------------------------------------------------------------
+  Service /        Username or identifier          Password / secret source        Where to update it
+  account                                                                          
+  ---------------- ------------------------------- ------------------------------- ---------------------------------------
+  Keycloak         Value of                        Value of                        Edit `.env.keycloak` for a **fresh**
+  bootstrap        `KC_BOOTSTRAP_ADMIN_USERNAME`   `KC_BOOTSTRAP_ADMIN_PASSWORD`   Keycloak data store. For an
+  administrator    (the setup script initially     in local `.env.keycloak`;       already-initialized realm, change the
+                   uses `admin`)                   `setupscripts.sh` generates a   administrator password through
+                                                   random password when it creates Keycloak's administration UI or
+                                                   this file                       supported account-recovery procedure;
+                                                                                   editing the environment file alone does
+                                                                                   not reset it
 
-  Application OIDC  Client ID `ai-starter-kit-web`  Client secret in                Update both the realm client
-  client                                            `keycloak/realm-export.json`,   configuration and `.env.local`
-                                                    matched by                      together; never expose the secret to
-                                                    `AUTH_KEYCLOAK_SECRET` in       browser-side code
-                                                    `.env.local`                    
+  Application OIDC Client ID `ai-starter-kit-web`  Client secret in                Update both the realm client
+  client                                           `keycloak/realm-export.json`,   configuration and `.env.local`
+                                                   matched by                      together; never expose the secret to
+                                                   `AUTH_KEYCLOAK_SECRET` in       browser-side code
+                                                   `.env.local`                    
 
-  Application       `starter-developer`             Current local bootstrap script  Update the password in
-  developer test                                    sets `DevOpsDev123!`            `scripts/bootstrap-keycloak-users.sh`
-  user                                                                              **and** update the user's password in
-                                                                                    Keycloak, or change it in the Keycloak
-                                                                                    UI and stop using the script's old
-                                                                                    password
+  Application      `starter-developer`             Current local bootstrap script  Update the password in
+  developer test                                   sets `DevOpsDev123!`            `scripts/bootstrap-keycloak-users.sh`
+  user                                                                             **and** update the user's password in
+                                                                                   Keycloak, or change it in the Keycloak
+                                                                                   UI and stop using the script's old
+                                                                                   password
 
-  Application       `starter-viewer`                Current local bootstrap script  Update the password in
-  viewer test user                                  sets `DevOpsView123!`           `scripts/bootstrap-keycloak-users.sh`
-                                                                                    **and** update the user's password in
-                                                                                    Keycloak, or change it in the Keycloak
-                                                                                    UI and stop using the script's old
-                                                                                    password
+  Application      `starter-viewer`                Current local bootstrap script  Update the password in
+  viewer test user                                 sets `DevOpsView123!`           `scripts/bootstrap-keycloak-users.sh`
+                                                                                   **and** update the user's password in
+                                                                                   Keycloak, or change it in the Keycloak
+                                                                                   UI and stop using the script's old
+                                                                                   password
 
-  Application admin No separate built-in admin      No default admin-role user's    Create a dedicated user in Keycloak,
-  role              username is provisioned by the  password is defined by that     assign the `admin` realm role, and set
-                    documented developer/viewer     script                          a unique password in Keycloak
-                    bootstrap script                                                
+  Application      No separate built-in admin      No default admin-role user's    Create a dedicated user in Keycloak,
+  admin role       username is provisioned by the  password is defined by that     assign the `admin` realm role, and set
+                   documented developer/viewer     script                          a unique password in Keycloak
+                   bootstrap script                                                
 
-  Archestra         No universal application-level  Set up or use the administrator Configure/manage access in the
-  administration UI default is defined by this      account required by the running Archestra UI at
-                    repository                      Archestra instance              `http://localhost:3000`; follow the
-                                                                                    prompts and version-specific setup for
-                                                                                    your instance
+  Archestra        No universal application-level  Set up or use the administrator Configure/manage access in the
+  administration   default is defined by this      account required by the running Archestra UI at
+  UI               repository                      Archestra instance              `http://localhost:3000`; follow the
+                                                                                   prompts and version-specific setup for
+                                                                                   your instance
 
-  Archestra model   Virtual key configured in       `ARCHESTRA_VIRTUAL_KEY` in      Create or rotate the key in Archestra,
-  gateway           Archestra                       `.env.local`; model identifier  then update `.env.local`. Configure the
-                                                    is `ARCHESTRA_MODEL`            corresponding model/provider connection
-                                                                                    in Archestra
+  Archestra model  Virtual key configured in       `ARCHESTRA_VIRTUAL_KEY` in      Create or rotate the key in Archestra,
+  gateway          Archestra                       `.env.local`; model identifier  then update `.env.local`. Configure the
+                                                   is `ARCHESTRA_MODEL`            corresponding model/provider connection
+                                                                                   in Archestra
 
-  Model provider    Provider-specific account/API   Configured in Archestra's       Update the provider credential in
-  (for example,     key                             provider/model connection       Archestra. Do not put provider keys in
-  OpenRouter)                                                                       browser code or commit them to Git
-  -------------------------------------------------------------------------------------------------------------------------
+  Model provider   Provider-specific account/API   Configured in Archestra's       Update the provider credential in
+  (for example,    key                             provider/model connection       Archestra. Do not put provider keys in
+  OpenRouter)                                                                      browser code or commit them to Git
+  ------------------------------------------------------------------------------------------------------------------------
 
 **Important:** The repository does not define a universal default
 username/password for Archestra. Do not assume `admin/admin` or reuse
@@ -512,14 +513,14 @@ in `.env.local`.
 The current `scripts/bootstrap-keycloak-users.sh` script contains these
 local-only test accounts:
 
-  -----------------------------------------------------------------------------
-  Application user      Keycloak realm     Realm role        Current script
-                                                             password
-  --------------------- ------------------ ----------------- ------------------
-  `starter-developer`   `ai-starter-kit`   `developer`       `DevOpsDev123!`
+  ---------------------------------------------------------------------------
+  Application user      Keycloak realm     Realm role      Current script
+                                                           password
+  --------------------- ------------------ --------------- ------------------
+  `starter-developer`   `ai-starter-kit`   `developer`     `DevOpsDev123!`
 
-  `starter-viewer`      `ai-starter-kit`   `viewer`          `DevOpsView123!`
-  -----------------------------------------------------------------------------
+  `starter-viewer`      `ai-starter-kit`   `viewer`        `DevOpsView123!`
+  ---------------------------------------------------------------------------
 
 These are **known demo credentials, not secure defaults**. Replace them
 before sharing the repository or using it in any shared environment. The
