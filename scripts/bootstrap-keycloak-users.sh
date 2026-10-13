@@ -6,9 +6,9 @@ ADMIN_USER="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}"
 
 DEVELOPER_USER="starter-developer"
-DEVELOPER_PASSWORD="DevOpsDev123!"
+DEVELOPER_PASSWORD="StarterDev123!"
 VIEWER_USER="starter-viewer"
-VIEWER_PASSWORD="DevOpsView123!"
+VIEWER_PASSWORD="StarterView123!"
 
 KCADM="/opt/keycloak/bin/kcadm.sh"
 

@@ -468,14 +468,14 @@ interchangeable.
                                                    `.env.local`                    
 
   Application      `starter-developer`             Current local bootstrap script  Update the password in
-  developer test                                   sets `DevOpsDev123!`            `scripts/bootstrap-keycloak-users.sh`
+  developer test                                   sets `StarterDev123!`            `scripts/bootstrap-keycloak-users.sh`
   user                                                                             **and** update the user's password in
                                                                                    Keycloak, or change it in the Keycloak
                                                                                    UI and stop using the script's old
                                                                                    password
 
   Application      `starter-viewer`                Current local bootstrap script  Update the password in
-  viewer test user                                 sets `DevOpsView123!`           `scripts/bootstrap-keycloak-users.sh`
+  viewer test user                                 sets `StarterView123!`           `scripts/bootstrap-keycloak-users.sh`
                                                                                    **and** update the user's password in
                                                                                    Keycloak, or change it in the Keycloak
                                                                                    UI and stop using the script's old
@@ -517,13 +517,12 @@ local-only test accounts:
   Application user      Keycloak realm     Realm role      Current script
                                                            password
   --------------------- ------------------ --------------- ------------------
-  `starter-developer`   `ai-starter-kit`   `developer`     `DevOpsDev123!`
+  `starter-developer`   `ai-starter-kit`   `developer`     `StarterDev123!`
 
-  `starter-viewer`      `ai-starter-kit`   `viewer`        `DevOpsView123!`
+  `starter-viewer`      `ai-starter-kit`   `viewer`        `StarterView123!`
   ---------------------------------------------------------------------------
 
-These are **known demo credentials, not secure defaults**. Replace them
-before sharing the repository or using it in any shared environment. The
+These are **generic local demo credentials, not secure defaults**. The bootstrap script uses `StarterDev123!` and `StarterView123!` for these test accounts. Change them before sharing the repository or using it in any shared environment. The
 bootstrap script does not currently provision an application user with
 the `admin` realm role.
 
@@ -813,7 +812,7 @@ docker compose up -d
 
 **Project migration warning:** `docker compose down` targets the project
 name resolved from the current configuration. If the existing containers
-still have the old `ai-devops-configuration-expert` project label,
+still have a label from the previous Compose project,
 running `docker compose down` with the new name `ai-starter-kit` will
 not stop those old containers. Inspect the project labels first (Section
 13).
@@ -1082,10 +1081,9 @@ App data:     ai-starter-kit-app-data
 Keycloak:     ai-starter-kit-keycloak-data
 ```
 
-If this checkout previously ran under the directory/project name
-`ai-devops-configuration-expert`, its existing containers may still be
-attached to the old project and old volumes. The new volumes do not
-inherit or copy existing data.
+If this checkout previously ran under a different Compose project name, its
+existing containers may still be attached to that project and its volumes.
+The new volumes do not inherit or copy existing data.
 
 Inspect the current labels and attachments before switching:
 
@@ -1104,7 +1102,7 @@ done
 A safe migration plan is:
 
 1.  Validate `docker compose config`.
-2.  Inspect old project labels and volume attachments.
+2.  Inspect existing project labels and volume attachments.
 3.  Confirm which existing data must be retained or discarded.
 4.  Stop only the old Compose project by explicitly targeting its old
     project name if necessary.
