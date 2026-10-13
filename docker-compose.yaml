@@ -1,0 +1,40 @@
+name: ${COMPOSE_PROJECT_NAME:-ai-starter-kit}
+
+services:
+  archestra:
+    image: archestra/platform:1.4.0-rc.36@sha256:b673affbc4f6704ba181b815ab7ce8352397ee084702742d6ee93159551bac2f
+    container_name: archestra
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - app-data:/app/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    container_name: keycloak
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+    env_file:
+      - .env.keycloak
+    environment:
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-kit-realm.json:ro
+
+volumes:
+  postgres-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-postgres-data
+  app-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-data
+  keycloak-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-keycloak-data

@@ -1,0 +1,68 @@
+{
+  "realm": "ai-starter-kit",
+  "enabled": true,
+  "displayName": "AI Integration Starter",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "viewer",
+        "description": "Can access the application and permitted read-only capabilities."
+      },
+      {
+        "name": "developer",
+        "description": "Can use AI capabilities and generate and validate configurations."
+      },
+      {
+        "name": "admin",
+        "description": "Can access administrative application capabilities."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ai-starter-kit-web",
+      "name": "AI Starter Web Application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3001"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3001/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String"
+          }
+        }
+      ],
+      "secret": "ai-starter-kit-local-client-secret"
+    }
+  ]
+}
