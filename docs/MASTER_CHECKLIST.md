@@ -1,5 +1,5 @@
 cat > docs/MASTER_CHECKLIST.md <<'CHECKLIST_EOF'
-# Master Checklist — AI Starter Kit
+# Master Checklist — AI Starter
 
 Last updated: 2026-10-13
 
@@ -47,8 +47,8 @@ production-readiness requirements.
 
 ### Identity and security
 
-- [x] Define an `ai-starter-kit` Keycloak realm export.
-- [x] Define the `ai-starter-kit-web` OIDC client in the realm configuration.
+- [x] Define an `ai-starter` Keycloak realm export.
+- [x] Define the `ai-starter-web` OIDC client in the realm configuration.
 - [x] Define the `viewer`, `developer`, and `admin` realm roles in the configuration.
 - [ ] Verify the effective realm, client, and roles in the running Keycloak instance.
 - [ ] Implement the application OIDC login flow.
@@ -131,8 +131,8 @@ Validation evidence:
 - [x] Add Keycloak to the Docker Compose configuration.
 - [x] Configure the local Keycloak HTTP port.
 - [x] Configure persistent Keycloak development data.
-- [x] Provide a realm export for `ai-starter-kit`.
-- [x] Define the `ai-starter-kit-web` client in the realm export.
+- [x] Provide a realm export for `ai-starter`.
+- [x] Define the `ai-starter-web` client in the realm export.
 - [x] Define the initial realm roles in the realm export.
 - [x] Provide `.env.keycloak.example`.
 - [x] Keep the actual `.env.keycloak` file out of Git.

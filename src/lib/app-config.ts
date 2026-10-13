@@ -12,5 +12,7 @@ export const appConfig = {
   packageName: packageJson.name,
   displayName:
     process.env.APP_DISPLAY_NAME?.trim() ||
-    titleCasePackageName(packageJson.name),
+    (packageJson.name === "ai-starter"
+      ? "AI Starter"
+      : titleCasePackageName(packageJson.name)),
 };

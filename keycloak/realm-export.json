@@ -1,5 +1,5 @@
 {
-  "realm": "ai-starter-kit",
+  "realm": "ai-starter",
   "enabled": true,
   "displayName": "AI Integration Starter",
   "registrationAllowed": false,
@@ -26,7 +26,7 @@
   },
   "clients": [
     {
-      "clientId": "ai-starter-kit-web",
+      "clientId": "ai-starter-web",
       "name": "AI Starter Web Application",
       "enabled": true,
       "protocol": "openid-connect",

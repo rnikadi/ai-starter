@@ -15,7 +15,7 @@ KCADM="/opt/keycloak/bin/kcadm.sh"
 echo "Waiting for Keycloak..."
 for attempt in $(seq 1 60); do
   if curl -fsS \
-    "${KEYCLOAK_URL}/realms/ai-starter-kit/.well-known/openid-configuration" \
+    "${KEYCLOAK_URL}/realms/ai-starter/.well-known/openid-configuration" \
     >/dev/null; then
     break
   fi
@@ -40,21 +40,21 @@ ensure_user() {
   local role="$3"
 
   if ! docker exec keycloak "$KCADM" get users \
-    -r ai-starter-kit -q "username=${username}" 2>/dev/null |
+    -r ai-starter -q "username=${username}" 2>/dev/null |
     grep -q '"username"'; then
     docker exec keycloak "$KCADM" create users \
-      -r ai-starter-kit \
+      -r ai-starter \
       -s "username=${username}" \
       -s enabled=true
   fi
 
   docker exec keycloak "$KCADM" set-password \
-    -r ai-starter-kit \
+    -r ai-starter \
     --username "$username" \
     --new-password "$password"
 
   docker exec keycloak "$KCADM" add-roles \
-    -r ai-starter-kit \
+    -r ai-starter \
     --uusername "$username" \
     --rolename "$role"
 

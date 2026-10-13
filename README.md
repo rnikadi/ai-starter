@@ -1,4 +1,4 @@
-# AI Starter Kit
+# AI Starter
 
 A reusable, local-first starter kit for AI applications built with
 Next.js, TypeScript, Mastra, Archestra, OpenRouter, and Keycloak.
@@ -12,7 +12,7 @@ production-ready platform.
 > passed in the existing working tree. The OIDC client ID, issuer, and
 > exported client secret have been checked for consistency. The Compose
 > project and volume names have been validated statically. The new
-> `ai-starter-kit` Compose project has not yet been started with its new
+> `ai-starter` Compose project has not yet been started with its new
 > volumes, and interactive login/RBAC must be verified against that
 > runtime.
 
@@ -86,7 +86,7 @@ OIDC discovery response does not prove the full login flow works.
 
 ``` json
 {
-  "name": "ai-starter-kit"
+  "name": "ai-starter"
 }
 ```
 
@@ -98,10 +98,10 @@ Expected names with the current package name:
 
   Resource                            Expected name
   ----------------------------------- --------------------------------
-  Compose project                     `ai-starter-kit`
-  Archestra PostgreSQL data volume    `ai-starter-kit-postgres-data`
-  Archestra application data volume   `ai-starter-kit-app-data`
-  Keycloak data volume                `ai-starter-kit-keycloak-data`
+  Compose project                     `ai-starter`
+  Archestra PostgreSQL data volume    `ai-starter-postgres-data`
+  Archestra application data volume   `ai-starter-app-data`
+  Keycloak data volume                `ai-starter-keycloak-data`
   Archestra service/container         `archestra`
   Keycloak service/container          `keycloak`
 
@@ -145,8 +145,8 @@ Start Docker Desktop before using Compose.
 Clone the published repository and enter its root directory:
 
 ``` bash
-git clone <YOUR-REPOSITORY-URL> ai-starter-kit
-cd ai-starter-kit
+git clone <YOUR-REPOSITORY-URL> ai-starter
+cd ai-starter
 ```
 
 If you already have the repository, run all commands below from its
@@ -190,10 +190,10 @@ Important variables include:
 
   `ARCHESTRA_MODEL`          Model identifier available through Archestra
 
-  `AUTH_KEYCLOAK_ID`         OIDC client ID; expected `ai-starter-kit-web`
+  `AUTH_KEYCLOAK_ID`         OIDC client ID; expected `ai-starter-web`
 
   `AUTH_KEYCLOAK_ISSUER`     Expected
-                             `http://localhost:8080/realms/ai-starter-kit`
+                             `http://localhost:8080/realms/ai-starter`
 
   `AUTH_KEYCLOAK_SECRET`     Must match the confidential client secret in
                              `keycloak/realm-export.json`
@@ -291,16 +291,16 @@ for key, volume in config.get("volumes", {}).items():
 docker compose config --services
 ```
 
-Expected project: `ai-starter-kit`.
+Expected project: `ai-starter`.
 
 Expected services: `archestra`, `keycloak`.
 
 Expected volumes:
 
 ``` text
-postgres-data -> ai-starter-kit-postgres-data
-app-data -> ai-starter-kit-app-data
-keycloak-data -> ai-starter-kit-keycloak-data
+postgres-data -> ai-starter-postgres-data
+app-data -> ai-starter-app-data
+keycloak-data -> ai-starter-keycloak-data
 ```
 
 The named volumes are created when the new Compose project starts. A
@@ -341,8 +341,8 @@ The realm export is `keycloak/realm-export.json`.
 
   Setting         Value
   --------------- ---------------------------
-  Realm           `ai-starter-kit`
-  OIDC client     `ai-starter-kit-web`
+  Realm           `ai-starter`
+  OIDC client     `ai-starter-web`
   Client type     Confidential
   Standard flow   Enabled
   PKCE            `S256`
@@ -364,14 +364,14 @@ through `realm_access.roles`.
 
 ``` bash
 curl --fail --silent --show-error \
-  http://localhost:8080/realms/ai-starter-kit/.well-known/openid-configuration \
+  http://localhost:8080/realms/ai-starter/.well-known/openid-configuration \
   | jq '{issuer, authorization_endpoint, token_endpoint, jwks_uri}'
 ```
 
 Expected issuer:
 
 ``` text
-http://localhost:8080/realms/ai-starter-kit
+http://localhost:8080/realms/ai-starter
 ```
 
 ### 7.2 Create local test users
@@ -461,7 +461,7 @@ interchangeable.
                                                                                    editing the environment file alone does
                                                                                    not reset it
 
-  Application OIDC Client ID `ai-starter-kit-web`  Client secret in                Update both the realm client
+  Application OIDC Client ID `ai-starter-web`  Client secret in                Update both the realm client
   client                                           `keycloak/realm-export.json`,   configuration and `.env.local`
                                                    matched by                      together; never expose the secret to
                                                    `AUTH_KEYCLOAK_SECRET` in       browser-side code
@@ -517,9 +517,9 @@ local-only test accounts:
   Application user      Keycloak realm     Realm role      Current script
                                                            password
   --------------------- ------------------ --------------- ------------------
-  `starter-developer`   `ai-starter-kit`   `developer`     `StarterDev123!`
+  `starter-developer`   `ai-starter`   `developer`     `StarterDev123!`
 
-  `starter-viewer`      `ai-starter-kit`   `viewer`        `StarterView123!`
+  `starter-viewer`      `ai-starter`   `viewer`        `StarterView123!`
   ---------------------------------------------------------------------------
 
 These are **generic local demo credentials, not secure defaults**. The bootstrap script uses `StarterDev123!` and `StarterView123!` for these test accounts. Change them before sharing the repository or using it in any shared environment. The
@@ -536,7 +536,7 @@ usernames/passwords in the Next.js application.
 2.  Change `DEVELOPER_USER`, `DEVELOPER_PASSWORD`, `VIEWER_USER`, and
     `VIEWER_PASSWORD` to the local values you want.
 3.  Do not use production or reused passwords in this script.
-4.  Start Keycloak and verify that the `ai-starter-kit` realm is
+4.  Start Keycloak and verify that the `ai-starter` realm is
     available.
 5.  Run the script to apply the configured users/passwords and role
     assignments:
@@ -560,7 +560,7 @@ Alternatively, update a user's password in Keycloak directly:
 
 1.  Open `http://localhost:8080/admin/`.
 2.  Sign in with a working Keycloak administrator account.
-3.  Select the `ai-starter-kit` realm and open **Users**.
+3.  Select the `ai-starter` realm and open **Users**.
 4.  Select the user and open **Credentials**.
 5.  Set a new password and disable **Temporary** if the user should not
     be forced to change it at the next login.
@@ -580,7 +580,7 @@ script provisions only `starter-developer` and `starter-viewer`.
 To create a local administrator:
 
 1.  Sign in to the Keycloak administration console.
-2.  Select the `ai-starter-kit` realm.
+2.  Select the `ai-starter` realm.
 3.  Create a user with a unique username and a strong local-only
     password.
 4.  Enable the user.
@@ -594,10 +594,10 @@ separation. Keep separate accounts when validating role-based behavior.
 
 ### 8.5 Rotate the OIDC client secret
 
-The confidential OIDC client is `ai-starter-kit-web`.
+The confidential OIDC client is `ai-starter-web`.
 
-1.  In Keycloak, open the `ai-starter-kit` realm and select **Clients**
-    → `ai-starter-kit-web`.
+1.  In Keycloak, open the `ai-starter` realm and select **Clients**
+    → `ai-starter-web`.
 2.  Locate the client credentials/secret section and generate or set a
     new secret using the controls supported by your Keycloak version.
 3.  Update `AUTH_KEYCLOAK_SECRET` in `.env.local` to the same value.
@@ -813,7 +813,7 @@ docker compose up -d
 **Project migration warning:** `docker compose down` targets the project
 name resolved from the current configuration. If the existing containers
 still have a label from the previous Compose project,
-running `docker compose down` with the new name `ai-starter-kit` will
+running `docker compose down` with the new name `ai-starter` will
 not stop those old containers. Inspect the project labels first (Section
 13).
 
@@ -894,7 +894,7 @@ variables; they may contain credentials.
 ``` bash
 # OIDC discovery document.
 curl --fail --silent --show-error \
-  http://localhost:8080/realms/ai-starter-kit/.well-known/openid-configuration \
+  http://localhost:8080/realms/ai-starter/.well-known/openid-configuration \
   | jq '{issuer, authorization_endpoint, token_endpoint, jwks_uri}'
 
 # Admin UI HTTP response.
@@ -947,9 +947,9 @@ documented by the actual running configuration.
 ``` bash
 # Check expected new volume names.
 docker volume inspect \
-  ai-starter-kit-postgres-data \
-  ai-starter-kit-app-data \
-  ai-starter-kit-keycloak-data
+  ai-starter-postgres-data \
+  ai-starter-app-data \
+  ai-starter-keycloak-data
 
 # List Docker volumes without deleting them.
 docker volume ls
@@ -992,7 +992,7 @@ curl -sS -o /dev/null \
 # Keycloak discovery.
 curl -sS -o /dev/null \
   -w 'Keycloak discovery HTTP status: %{http_code}\n' \
-  http://localhost:8080/realms/ai-starter-kit/.well-known/openid-configuration
+  http://localhost:8080/realms/ai-starter/.well-known/openid-configuration
 
 # Mastra-to-Archestra integration.
 pnpm test:archestra
@@ -1042,8 +1042,8 @@ initialized data volume.
 
 1.  Verify Keycloak is reachable at `http://localhost:8080`.
 2.  Verify realm discovery at
-    `/realms/ai-starter-kit/.well-known/openid-configuration`.
-3.  Confirm `.env.local` has client ID `ai-starter-kit-web`, the
+    `/realms/ai-starter/.well-known/openid-configuration`.
+3.  Confirm `.env.local` has client ID `ai-starter-web`, the
     matching issuer, and a client secret matching the realm export.
 4.  Confirm the realm client has redirect URI `http://localhost:3001/*`,
     confidential client authentication, standard flow, and PKCE `S256`.
@@ -1075,10 +1075,10 @@ ports, application port, and Keycloak redirect URI).
 The new configuration resolves the project name and volumes to:
 
 ``` text
-Project:      ai-starter-kit
-PostgreSQL:   ai-starter-kit-postgres-data
-App data:     ai-starter-kit-app-data
-Keycloak:     ai-starter-kit-keycloak-data
+Project:      ai-starter
+PostgreSQL:   ai-starter-postgres-data
+App data:     ai-starter-app-data
+Keycloak:     ai-starter-keycloak-data
 ```
 
 If this checkout previously ran under a different Compose project name, its
@@ -1205,7 +1205,7 @@ Last updated: 2026-10-13.
   Compose project name and expected  Passed static configuration
   volume names                       validation
 
-  New `ai-starter-kit` containers    Not yet verified
+  New `ai-starter` containers    Not yet verified
   started                            
 
   Interactive Keycloak browser login Must be verified after runtime

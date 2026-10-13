@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-ai-starter-kit}
+name: ${COMPOSE_PROJECT_NAME:-ai-starter}
 
 services:
   archestra:
@@ -29,7 +29,7 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - keycloak-data:/opt/keycloak/data
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-kit-realm.json:ro
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-realm.json:ro
 
 volumes:
   postgres-data:
