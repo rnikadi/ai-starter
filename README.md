@@ -180,24 +180,24 @@ logs.
 
 Important variables include:
 
-  -----------------------------------------------------------------------------------
-  Variable                            Purpose
-  ----------------------------------- -----------------------------------------------
-  `ARCHESTRA_BASE_URL`                Archestra OpenAI-compatible endpoint; local
-                                      examples use `http://localhost:9000/v1`
+  -----------------------------------------------------------------------------
+  Variable                      Purpose
+  ----------------------------- -----------------------------------------------
+  `ARCHESTRA_BASE_URL`          Archestra OpenAI-compatible endpoint; local
+                                examples use `http://localhost:9000/v1`
 
-  `ARCHESTRA_VIRTUAL_KEY`             Virtual key configured in Archestra
+  `ARCHESTRA_VIRTUAL_KEY`       Virtual key configured in Archestra
 
-  `ARCHESTRA_MODEL`                   Model identifier available through Archestra
+  `ARCHESTRA_MODEL`             Model identifier available through Archestra
 
-  `AUTH_KEYCLOAK_ID`                  OIDC client ID; expected `ai-starter-kit-web`
+  `AUTH_KEYCLOAK_ID`            OIDC client ID; expected `ai-starter-kit-web`
 
-  `AUTH_KEYCLOAK_ISSUER`              Expected
-                                      `http://localhost:8080/realms/ai-starter-kit`
+  `AUTH_KEYCLOAK_ISSUER`        Expected
+                                `http://localhost:8080/realms/ai-starter-kit`
 
-  `AUTH_KEYCLOAK_SECRET`              Must match the confidential client secret in
-                                      `keycloak/realm-export.json`
-  -----------------------------------------------------------------------------------
+  `AUTH_KEYCLOAK_SECRET`        Must match the confidential client secret in
+                                `keycloak/realm-export.json`
+  -----------------------------------------------------------------------------
 
 Use a model identifier and virtual key that are valid in your Archestra
 configuration. Do not expose these values to browser-side code or
@@ -430,7 +430,284 @@ validation commands.
 The Next.js server runs on the host; restarting Docker Compose does not
 restart the host process.
 
-## 9. Test the AI integration
+## 9. Credentials and Test Accounts
+
+> **WARNING --- LOCAL DEVELOPMENT CREDENTIALS ONLY**
+>
+> The credentials and procedures in this section are intended only for a
+> disposable local development environment. Change passwords, secrets,
+> and API keys before sharing the project, publishing a repository, or
+> deploying anywhere outside your own machine. Never commit `.env`,
+> `.env.local`, `.env.keycloak`, access tokens, Archestra virtual keys,
+> or real passwords. The demo passwords shown below are not secure
+> defaults for shared environments.
+
+This starter kit uses separate credentials for infrastructure
+administration, AI gateway access, and application users. These are not
+interchangeable.
+
+### 8.1 Credentials overview
+
+  -------------------------------------------------------------------------------------------------------------------------
+  Service / account Username or identifier          Password / secret source        Where to update it
+  ----------------- ------------------------------- ------------------------------- ---------------------------------------
+  Keycloak          Value of                        Value of                        Edit `.env.keycloak` for a **fresh**
+  bootstrap         `KC_BOOTSTRAP_ADMIN_USERNAME`   `KC_BOOTSTRAP_ADMIN_PASSWORD`   Keycloak data store. For an
+  administrator     (the setup script initially     in local `.env.keycloak`;       already-initialized realm, change the
+                    uses `admin`)                   `setupscripts.sh` generates a   administrator password through
+                                                    random password when it creates Keycloak's administration UI or
+                                                    this file                       supported account-recovery procedure;
+                                                                                    editing the environment file alone does
+                                                                                    not reset it
+
+  Application OIDC  Client ID `ai-starter-kit-web`  Client secret in                Update both the realm client
+  client                                            `keycloak/realm-export.json`,   configuration and `.env.local`
+                                                    matched by                      together; never expose the secret to
+                                                    `AUTH_KEYCLOAK_SECRET` in       browser-side code
+                                                    `.env.local`                    
+
+  Application       `starter-developer`             Current local bootstrap script  Update the password in
+  developer test                                    sets `DevOpsDev123!`            `scripts/bootstrap-keycloak-users.sh`
+  user                                                                              **and** update the user's password in
+                                                                                    Keycloak, or change it in the Keycloak
+                                                                                    UI and stop using the script's old
+                                                                                    password
+
+  Application       `starter-viewer`                Current local bootstrap script  Update the password in
+  viewer test user                                  sets `DevOpsView123!`           `scripts/bootstrap-keycloak-users.sh`
+                                                                                    **and** update the user's password in
+                                                                                    Keycloak, or change it in the Keycloak
+                                                                                    UI and stop using the script's old
+                                                                                    password
+
+  Application admin No separate built-in admin      No default admin-role user's    Create a dedicated user in Keycloak,
+  role              username is provisioned by the  password is defined by that     assign the `admin` realm role, and set
+                    documented developer/viewer     script                          a unique password in Keycloak
+                    bootstrap script                                                
+
+  Archestra         No universal application-level  Set up or use the administrator Configure/manage access in the
+  administration UI default is defined by this      account required by the running Archestra UI at
+                    repository                      Archestra instance              `http://localhost:3000`; follow the
+                                                                                    prompts and version-specific setup for
+                                                                                    your instance
+
+  Archestra model   Virtual key configured in       `ARCHESTRA_VIRTUAL_KEY` in      Create or rotate the key in Archestra,
+  gateway           Archestra                       `.env.local`; model identifier  then update `.env.local`. Configure the
+                                                    is `ARCHESTRA_MODEL`            corresponding model/provider connection
+                                                                                    in Archestra
+
+  Model provider    Provider-specific account/API   Configured in Archestra's       Update the provider credential in
+  (for example,     key                             provider/model connection       Archestra. Do not put provider keys in
+  OpenRouter)                                                                       browser code or commit them to Git
+  -------------------------------------------------------------------------------------------------------------------------
+
+**Important:** The repository does not define a universal default
+username/password for Archestra. Do not assume `admin/admin` or reuse
+Keycloak credentials for Archestra. Follow the setup flow presented by
+the actual Archestra image/version and store the resulting virtual key
+in `.env.local`.
+
+### 8.2 Current local test-user credentials
+
+The current `scripts/bootstrap-keycloak-users.sh` script contains these
+local-only test accounts:
+
+  -----------------------------------------------------------------------------
+  Application user      Keycloak realm     Realm role        Current script
+                                                             password
+  --------------------- ------------------ ----------------- ------------------
+  `starter-developer`   `ai-starter-kit`   `developer`       `DevOpsDev123!`
+
+  `starter-viewer`      `ai-starter-kit`   `viewer`          `DevOpsView123!`
+  -----------------------------------------------------------------------------
+
+These are **known demo credentials, not secure defaults**. Replace them
+before sharing the repository or using it in any shared environment. The
+bootstrap script does not currently provision an application user with
+the `admin` realm role.
+
+The application uses Keycloak for sign-in. Therefore, application test
+users are Keycloak realm users; they are not stored as separate
+usernames/passwords in the Next.js application.
+
+### 8.3 Change the developer and viewer test passwords
+
+1.  Open `scripts/bootstrap-keycloak-users.sh`.
+2.  Change `DEVELOPER_USER`, `DEVELOPER_PASSWORD`, `VIEWER_USER`, and
+    `VIEWER_PASSWORD` to the local values you want.
+3.  Do not use production or reused passwords in this script.
+4.  Start Keycloak and verify that the `ai-starter-kit` realm is
+    available.
+5.  Run the script to apply the configured users/passwords and role
+    assignments:
+
+``` bash
+bash -n scripts/bootstrap-keycloak-users.sh
+./scripts/bootstrap-keycloak-users.sh
+```
+
+6.  Sign in to the application at `http://localhost:3001` and test each
+    account.
+7.  If a user already exists and you change the script, run the script
+    again to update the password and ensure the role assignment is
+    correct.
+
+The current script contains plaintext demo passwords. For a shared or
+production-grade environment, replace this approach with a secret input
+mechanism or secure secret store and do not commit actual credentials.
+
+Alternatively, update a user's password in Keycloak directly:
+
+1.  Open `http://localhost:8080/admin/`.
+2.  Sign in with a working Keycloak administrator account.
+3.  Select the `ai-starter-kit` realm and open **Users**.
+4.  Select the user and open **Credentials**.
+5.  Set a new password and disable **Temporary** if the user should not
+    be forced to change it at the next login.
+6.  Open **Role mapping** and confirm that the user has only the
+    intended realm role.
+
+If you change a password in the Keycloak UI but leave the old password
+in `scripts/bootstrap-keycloak-users.sh`, running that script later will
+set the password back to the value in the script. Keep them aligned or
+update the script.
+
+### 8.4 Create a dedicated application administrator
+
+The realm defines an `admin` role, but the current local bootstrap
+script provisions only `starter-developer` and `starter-viewer`.
+
+To create a local administrator:
+
+1.  Sign in to the Keycloak administration console.
+2.  Select the `ai-starter-kit` realm.
+3.  Create a user with a unique username and a strong local-only
+    password.
+4.  Enable the user.
+5.  Set the password under **Credentials**.
+6.  Under **Role mapping**, assign the realm role `admin`.
+7.  Test the account in the application and verify that its displayed
+    roles and allowed operations match the intended policy.
+
+Do not simply grant `admin` to a developer account to avoid testing role
+separation. Keep separate accounts when validating role-based behavior.
+
+### 8.5 Rotate the OIDC client secret
+
+The confidential OIDC client is `ai-starter-kit-web`.
+
+1.  In Keycloak, open the `ai-starter-kit` realm and select **Clients**
+    → `ai-starter-kit-web`.
+2.  Locate the client credentials/secret section and generate or set a
+    new secret using the controls supported by your Keycloak version.
+3.  Update `AUTH_KEYCLOAK_SECRET` in `.env.local` to the same value.
+4.  Restart the Next.js development server so it reloads environment
+    variables.
+5.  Verify login again.
+
+The checked-in realm export contains a local development client secret.
+Replace it before sharing or publishing the starter kit. If you change
+the tracked realm export for local consistency, do not put a production
+secret into a committed JSON file; prefer environment-specific realm
+provisioning for shared deployments.
+
+To check that the current local secret and realm export match without
+printing the secret:
+
+``` bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+def read_env(path):
+    values = {}
+    for line in Path(path).read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+env = read_env(".env.local")
+realm = json.loads(Path("keycloak/realm-export.json").read_text())
+client_id = env.get("AUTH_KEYCLOAK_ID")
+client = next((c for c in realm.get("clients", []) if c.get("clientId") == client_id), None)
+
+ok = bool(client and env.get("AUTH_KEYCLOAK_SECRET") and env["AUTH_KEYCLOAK_SECRET"] == client.get("secret"))
+print("OIDC client secret matches realm export:", "PASS" if ok else "FAIL")
+if not ok:
+    raise SystemExit(1)
+PY
+```
+
+### 8.6 Change the Keycloak bootstrap administrator password
+
+For a fresh local database, `setupscripts.sh` creates `.env.keycloak`
+with a randomly generated `KC_BOOTSTRAP_ADMIN_PASSWORD`. To choose your
+own password before first initialization:
+
+1.  Stop before starting Keycloak for the first time.
+2.  Edit `.env.keycloak` and set `KC_BOOTSTRAP_ADMIN_USERNAME` and
+    `KC_BOOTSTRAP_ADMIN_PASSWORD`.
+3.  Protect the file with restrictive permissions:
+
+``` bash
+chmod 600 .env.keycloak
+```
+
+For an already-initialized Keycloak data volume, changing
+`.env.keycloak` does **not** change the existing administrator's
+password. Use the Keycloak administration UI or a supported recovery
+procedure instead. Do not delete the volume just to change a password.
+
+### 8.7 Change Archestra and provider credentials
+
+1.  Open the Archestra UI at `http://localhost:3000`.
+2.  Sign in using the administrator account configured for that
+    Archestra instance.
+3.  Configure the model/provider connection, such as OpenRouter, using
+    credentials from the provider.
+4.  Create or rotate an Archestra virtual key for the application.
+5.  Update these values in `.env.local`:
+
+``` dotenv
+ARCHESTRA_BASE_URL=http://localhost:9000/v1
+ARCHESTRA_VIRTUAL_KEY=<your-new-archestra-virtual-key>
+ARCHESTRA_MODEL=<model-id-configured-in-archestra>
+```
+
+6.  Restart the Next.js development server to load the changed
+    environment.
+7.  Test the integration:
+
+``` bash
+pnpm test:archestra
+```
+
+The exact Archestra login/bootstrap behavior can vary by image version
+and existing persistent data. This repository does not provide a
+universal Archestra password. Do not delete Archestra volumes to recover
+a login without first reviewing the supported recovery procedure and
+backing up any data you need.
+
+### 8.8 Before sharing or publishing
+
+Before making the repository public or using it in a shared environment:
+
+-   Replace the demo developer/viewer passwords.
+-   Replace the local OIDC client secret and ensure local environment
+    configuration matches it.
+-   Remove any personal or real provider credentials from local files
+    and commit history.
+-   Keep `.env`, `.env.local`, and `.env.keycloak` ignored and
+    untracked.
+-   Avoid committing production secrets into realm exports or scripts.
+-   Rotate any secret that has been exposed.
+-   Treat all credentials in this section as local-only examples.
+
+------------------------------------------------------------------------
+
+## 10. Test the AI integration
 
 The integration test is `scripts/test-archestra.ts` and is invoked by:
 
@@ -471,7 +748,7 @@ anonymous call is rejected, sign in through the browser and use an
 authenticated browser session for authorized testing. Avoid assuming the
 exact HTTP status without checking the route's current behavior.
 
-## 10. Validation commands
+## 11. Validation commands
 
 Run before submitting changes:
 
@@ -499,7 +776,7 @@ bash -n scripts/bootstrap-keycloak-users.sh
 git diff --check
 ```
 
-## 11. Command reference: daily Docker operations
+## 12. Command reference: daily Docker operations
 
 Run Compose commands from the repository root.
 
@@ -735,7 +1012,7 @@ docker ps --format 'table {{.Names}}\t{{.Ports}}'
 Identify the process before stopping it. Do not terminate unrelated
 processes.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 ### Compose configuration fails
 
@@ -789,11 +1066,11 @@ Verify locally that `ARCHESTRA_BASE_URL`, `ARCHESTRA_VIRTUAL_KEY`, and
 
 ### Port is already in use
 
-Use the port diagnostics in Section 11.9. Stop only the identified
+Use the port diagnostics in Section 12.9. Stop only the identified
 conflicting process or update all related settings together (Compose
 ports, application port, and Keycloak redirect URI).
 
-## 13. Compose project migration and volume safety
+## 14. Compose project migration and volume safety
 
 The new configuration resolves the project name and volumes to:
 
@@ -863,7 +1140,7 @@ Never delete a volume until its exact name and attachments are verified
 and any needed data has been backed up. This README does not authorize
 deleting old development volumes.
 
-## 14. Security and production readiness
+## 15. Security and production readiness
 
 This project is intended for local development. Before production use:
 
@@ -881,7 +1158,7 @@ This project is intended for local development. Before production use:
 Keycloak `start-dev` mode and local HTTP endpoints are not production
 settings.
 
-## 15. Project checklist and contribution
+## 16. Project checklist and contribution
 
 Track implementation status in `docs/MASTER_CHECKLIST.md`. Mark a
 capability complete only after it has been implemented and verified.
@@ -898,46 +1175,48 @@ Before opening a pull request:
 Never commit `.env`, `.env.local`, `.env.keycloak`, tokens, virtual
 keys, or real credentials.
 
-## 16. License
+## 17. License
 
 A license has not yet been selected. Add an appropriate `LICENSE` file
 before publishing as an open-source project. Until then, do not assume
 others have permission to redistribute or use the code.
 
-## 17. Current verification record
+## 18. Current verification record
 
 Last updated: 2026-10-13.
 
-  -----------------------------------------------------------------------
-  Check                               Status
-  ----------------------------------- -----------------------------------
-  TypeScript                          Passed in the existing working tree
-  (`pnpm exec tsc --noEmit`)          
+  ---------------------------------------------------------------------
+  Check                              Status
+  ---------------------------------- ----------------------------------
+  TypeScript                         Passed in the existing working
+  (`pnpm exec tsc --noEmit`)         tree
 
-  ESLint (`pnpm lint`)                Passed in the existing working tree
+  ESLint (`pnpm lint`)               Passed in the existing working
+                                     tree
 
-  Production build (`pnpm build`)     Passed in the existing working tree
+  Production build (`pnpm build`)    Passed in the existing working
+                                     tree
 
-  `git diff --check`                  Passed after the recent
-                                      naming/documentation changes
+  `git diff --check`                 Passed after the recent
+                                     naming/documentation changes
 
-  OIDC client/secret/issuer file      Passed
-  consistency                         
+  OIDC client/secret/issuer file     Passed
+  consistency                        
 
-  Compose project name and expected   Passed static configuration
-  volume names                        validation
+  Compose project name and expected  Passed static configuration
+  volume names                       validation
 
-  New `ai-starter-kit` containers     Not yet verified
-  started                             
+  New `ai-starter-kit` containers    Not yet verified
+  started                            
 
-  Interactive Keycloak browser login  Must be verified after runtime
-                                      migration
+  Interactive Keycloak browser login Must be verified after runtime
+                                     migration
 
-  Role extraction and API             Must be verified with real sessions
-  authorization                       
+  Role extraction and API            Must be verified with real
+  authorization                      sessions
 
-  Authenticated dashboard AI test     Must be verified after login
-  -----------------------------------------------------------------------
+  Authenticated dashboard AI test    Must be verified after login
+  ---------------------------------------------------------------------
 
 These statuses describe the reported local checks and should be updated
 as new runtime verification is completed.
