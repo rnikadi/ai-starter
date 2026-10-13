@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { connection } from "next/server";
-import { signInWithKeycloak, signOutOfApp } from "@/app/actions";
 import { AiTestPanel } from "@/app/dashboard/ai-test-panel";
 import { appConfig } from "@/lib/app-config";
+import { KeycloakSignInButton } from "@/components/auth/keycloak-sign-in-button";
+import { KeycloakSignOutButton } from "@/components/auth/keycloak-sign-out-button";
 
 const AI_ACCESS_ROLES = new Set<string>(["developer", "admin"]);
 
@@ -44,11 +45,7 @@ async function HomeContent() {
             </div>
           </div>
 
-          <form action={signInWithKeycloak}>
-            <button className="primary-button full-width" type="submit">
-              Sign in with Keycloak
-            </button>
-          </form>
+          <KeycloakSignInButton />
 
           <p className="security-note">
             Sign-in is handled by your configured identity provider.
@@ -94,17 +91,13 @@ async function HomeContent() {
             </span>
           </div>
 
-          <form action={signOutOfApp}>
-            <button className="secondary-button" type="submit">
-              Sign out
-            </button>
-          </form>
+          <KeycloakSignOutButton />
         </div>
       </header>
 
       <section className="welcome-section">
         <p className="eyebrow">WORKSPACE / OVERVIEW</p>
-        <h1>{appConfig.displayName + ' workspace'}</h1>
+        <h1>{appConfig.displayName + " workspace"}</h1>
         <p className="muted">
           Validate the AI connection and confirm that identity-based access
           controls are working.

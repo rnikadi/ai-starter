@@ -2,73 +2,201 @@
 set -euo pipefail
 
 KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
-ADMIN_USER="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
-ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}"
-
-DEVELOPER_USER="starter-developer"
-DEVELOPER_PASSWORD="StarterDev123!"
-VIEWER_USER="starter-viewer"
-VIEWER_PASSWORD="StarterView123!"
-
+REALM="ai-starter"
+CLIENT_ID="ai-starter-web"
 KCADM="/opt/keycloak/bin/kcadm.sh"
 
+if [[ ! -f ".env.keycloak" ]]; then
+  echo "ERROR: .env.keycloak was not found." >&2
+  exit 1
+fi
+
+set -a
+source ".env.keycloak"
+set +a
+
+ADMIN_USER="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-}"
+
+if [[ -z "$ADMIN_PASSWORD" ]]; then
+  echo "ERROR: Keycloak administrator password is not configured." >&2
+  exit 1
+fi
+
 echo "Waiting for Keycloak..."
+ready=false
+
 for attempt in $(seq 1 60); do
   if curl -fsS \
-    "${KEYCLOAK_URL}/realms/ai-starter/.well-known/openid-configuration" \
+    "${KEYCLOAK_URL}/realms/${REALM}/.well-known/openid-configuration" \
     >/dev/null; then
+    ready=true
     break
   fi
-
-  if [ "$attempt" -eq 60 ]; then
-    echo "ERROR: Keycloak did not become ready." >&2
-    exit 1
-  fi
-
   sleep 2
 done
+
+if [[ "$ready" != "true" ]]; then
+  echo "ERROR: Keycloak did not become ready." >&2
+  exit 1
+fi
 
 docker exec keycloak "$KCADM" config credentials \
   --server http://localhost:8080 \
   --realm master \
   --user "$ADMIN_USER" \
-  --password "$ADMIN_PASSWORD"
+  --password "$ADMIN_PASSWORD" >/dev/null
+
+echo "Looking up OIDC client..."
+
+CLIENT_JSON="$(
+  docker exec keycloak "$KCADM" get clients \
+    -r "$REALM" -q "clientId=${CLIENT_ID}"
+)"
+
+CLIENT_UUID="$(
+  printf '%s' "$CLIENT_JSON" |
+    node -e '
+      let input = "";
+      process.stdin.on("data", c => input += c);
+      process.stdin.on("end", () => {
+        const clients = JSON.parse(input);
+        const client = clients.find(c => c.clientId === "ai-starter-web");
+        if (!client) {
+          console.error("OIDC client ai-starter-web was not found.");
+          process.exit(1);
+        }
+        process.stdout.write(client.id);
+      });
+    '
+)"
+
+docker exec keycloak "$KCADM" update "clients/${CLIENT_UUID}" \
+  -r "$REALM" \
+  -s 'redirectUris=["http://localhost:3001/*"]' \
+  -s 'webOrigins=["http://localhost:3001"]' \
+  >/dev/null
+
+CLIENT_JSON="$(
+  docker exec keycloak "$KCADM" get "clients/${CLIENT_UUID}" -r "$REALM"
+)"
+
+printf '%s' "$CLIENT_JSON" |
+  node -e '
+    let input = "";
+    process.stdin.on("data", c => input += c);
+    process.stdin.on("end", () => {
+      const c = JSON.parse(input);
+      const valid =
+        c.enabled === true &&
+        (c.redirectUris || []).includes("http://localhost:3001/*") &&
+        (c.webOrigins || []).includes("http://localhost:3001") &&
+        c.attributes?.["post.logout.redirect.uris"] ===
+          "http://localhost:3001/*";
+
+      if (!valid) {
+        console.error("ERROR: Keycloak client redirect configuration is incomplete.");
+        process.exit(1);
+      }
+
+      console.log("OIDC login and logout redirect configuration verified.");
+    });
+  '
 
 ensure_user() {
   local username="$1"
   local password="$2"
   local role="$3"
+  local user_json
+  local user_id
 
-  if ! docker exec keycloak "$KCADM" get users \
-    -r ai-starter -q "username=${username}" 2>/dev/null |
-    grep -q '"username"'; then
+  user_json="$(
+    docker exec keycloak "$KCADM" get users \
+      -r "$REALM" -q "username=${username}"
+  )"
+
+  user_id="$(
+    printf '%s' "$user_json" |
+      USERNAME="$username" node -e '
+        let input = "";
+        process.stdin.on("data", c => input += c);
+        process.stdin.on("end", () => {
+          const users = JSON.parse(input);
+          const user = users.find(u => u.username === process.env.USERNAME);
+          if (user) process.stdout.write(user.id);
+        });
+      '
+  )"
+
+  if [[ -z "$user_id" ]]; then
+    echo "Creating demo user: ${username}"
+
     docker exec keycloak "$KCADM" create users \
-      -r ai-starter \
+      -r "$REALM" \
       -s "username=${username}" \
-      -s enabled=true
+      -s enabled=true \
+      >/dev/null
+  else
+    echo "Found existing demo user: ${username}"
   fi
 
   docker exec keycloak "$KCADM" set-password \
-    -r ai-starter \
+    -r "$REALM" \
     --username "$username" \
-    --new-password "$password"
+    --new-password "$password" \
+    >/dev/null
 
-  docker exec keycloak "$KCADM" add-roles \
-    -r ai-starter \
-    --uusername "$username" \
-    --rolename "$role"
+  docker exec keycloak "$KCADM" update "users/${user_id}" \
+    -r "$REALM" \
+    -s enabled=true \
+    -s 'requiredActions=[]' \
+    >/dev/null
 
-  echo "Configured ${username} with role ${role}."
+  user_json="$(
+    docker exec keycloak "$KCADM" get users \
+      -r "$REALM" -q "username=${username}"
+  )"
+
+  printf '%s' "$user_json" |
+    USERNAME="$username" node -e '
+      let input = "";
+      process.stdin.on("data", c => input += c);
+      process.stdin.on("end", () => {
+        const users = JSON.parse(input);
+        const user = users.find(u => u.username === process.env.USERNAME);
+        if (!user) {
+          console.error("ERROR: User lookup failed.");
+          process.exit(1);
+        }
+
+        const actions = user.requiredActions || [];
+        if (actions.includes("UPDATE_PASSWORD")) {
+          console.error(
+            "ERROR: UPDATE_PASSWORD is assigned to " + user.username +
+            ". Remove that action without changing other required actions."
+          );
+          process.exit(2);
+        }
+      });
+    '
+
+  if ! docker exec keycloak "$KCADM" get roles \
+    -r "$REALM" --uusername "$username" 2>/dev/null |
+    grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${role}\""; then
+    docker exec keycloak "$KCADM" add-roles \
+      -r "$REALM" \
+      --uusername "$username" \
+      --rolename "$role" \
+      >/dev/null
+  fi
+
+  echo "Configured ${username} (role: ${role}; default development password set)."
 }
 
-ensure_user "$DEVELOPER_USER" "$DEVELOPER_PASSWORD" developer
-ensure_user "$VIEWER_USER" "$VIEWER_PASSWORD" viewer
+ensure_user "starter-developer" "StarterDev123!" "developer"
+ensure_user "starter-viewer" "StarterView123!" "viewer"
 
 echo
-echo "Local Keycloak test users are ready."
-echo "Developer username: ${DEVELOPER_USER}"
-echo "Developer password: ${DEVELOPER_PASSWORD}"
-echo "Viewer username: ${VIEWER_USER}"
-echo "Viewer password: ${VIEWER_PASSWORD}"
-echo
-echo "These credentials are for local development only."
+echo "Keycloak bootstrap completed successfully."
+echo "Login and logout redirect configuration verified."
+echo "No containers, volumes, or realms were recreated."

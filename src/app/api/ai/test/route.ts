@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { connectionTestAgent } from "@/mastra/agents/connection-test-agent";
+import { validateAiTestRequest } from "@/lib/ai-test-request";
 
-const MAX_PROMPT_LENGTH = 10_000;
 const AI_ACCESS_ROLES = new Set<string>(["developer", "admin"]);
-
-interface TestRequest {
-  prompt?: unknown;
-}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -32,10 +28,10 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: TestRequest;
+  let body: unknown;
 
   try {
-    body = (await request.json()) as TestRequest;
+    body = await request.json();
   } catch {
     return NextResponse.json(
       { error: "Request body must be valid JSON." },
@@ -43,37 +39,17 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    typeof body.prompt !== "string"
-  ) {
-    return NextResponse.json(
-      { error: 'The "prompt" field must be a string.' },
-      { status: 400 },
-    );
-  }
+  const validation = validateAiTestRequest(body);
 
-  const prompt = body.prompt.trim();
-
-  if (!prompt) {
+  if (!validation.success) {
     return NextResponse.json(
-      { error: 'The "prompt" field must not be empty.' },
-      { status: 400 },
-    );
-  }
-
-  if (prompt.length > MAX_PROMPT_LENGTH) {
-    return NextResponse.json(
-      {
-        error: `The prompt must not exceed ${MAX_PROMPT_LENGTH} characters.`,
-      },
-      { status: 413 },
+      { error: validation.error },
+      { status: validation.status },
     );
   }
 
   try {
-    const result = await connectionTestAgent.generate(prompt);
+    const result = await connectionTestAgent.generate(validation.prompt);
 
     return NextResponse.json({
       result: result.text,

@@ -1,0 +1,436 @@
+============================================================
+AI STARTER - KEYCLOAK AUTOMATION REVIEW
+============================================================
+
+===== 1. KEYCLOAK CLIENT CONFIGURATION =====
+Realm: ai-starter
+{
+  "clientId": "ai-starter-web",
+  "name": "AI Starter Web Application",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": false,
+  "clientAuthenticatorType": "client-secret",
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": [
+    "http://localhost:3001/*"
+  ],
+  "webOrigins": [
+    "http://localhost:3001"
+  ],
+  "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": "http://localhost:3001/*"
+  },
+  "protocolMappers": [
+    {
+      "name": "realm-roles",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-realm-role-mapper",
+      "consentRequired": false,
+      "config": {
+        "multivalued": "true",
+        "userinfo.token.claim": "true",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "claim.name": "realm_access.roles",
+        "jsonType.label": "String"
+      }
+    }
+  ]
+}
+
+===== 2. STARTUP SCRIPT =====
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+# Keep the Docker Compose project name aligned with package.json.
+if ! command -v node >/dev/null 2>&1; then
+  echo "ERROR: Node.js is required to read the package name." >&2
+  exit 1
+fi
+
+PACKAGE_NAME="$(node -p "require('./package.json').name")"
+if [[ -z "$PACKAGE_NAME" ]]; then
+  echo "ERROR: package.json does not define a package name." >&2
+  exit 1
+fi
+
+export PACKAGE_NAME
+node <<'NODE'
+const fs = require("node:fs");
+
+const envPath = ".env";
+const packageName = process.env.PACKAGE_NAME;
+const lines = fs.existsSync(envPath)
+  ? fs.readFileSync(envPath, "utf8").split(/\r?\n/)
+  : [];
+
+const matching = lines
+  .map((line, index) => ({ line, index }))
+  .filter(({ line }) => /^\s*COMPOSE_PROJECT_NAME\s*=/.test(line));
+
+if (matching.length > 1) {
+  throw new Error("Multiple COMPOSE_PROJECT_NAME entries found in .env");
+}
+
+if (matching.length === 1) {
+  lines[matching[0].index] = `COMPOSE_PROJECT_NAME=${packageName}`;
+} else {
+  while (lines.length && lines[lines.length - 1] === "") lines.pop();
+  lines.push(`COMPOSE_PROJECT_NAME=${packageName}`);
+}
+
+fs.writeFileSync(envPath, lines.join("\n") + "\n", { mode: 0o600 });
+NODE
+
+echo "Docker Compose project name: ${PACKAGE_NAME}"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: Docker is required. Install Docker Desktop first." >&2
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "ERROR: Docker is not running. Start Docker Desktop and retry." >&2
+  exit 1
+fi
+
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "ERROR: openssl is required to generate a local password." >&2
+  exit 1
+fi
+
+if [[ ! -f .env.keycloak ]]; then
+  umask 077
+  printf 'KC_BOOTSTRAP_ADMIN_USERNAME=admin\nKC_BOOTSTRAP_ADMIN_PASSWORD=%s\n' \
+    "$(openssl rand -hex 32)" > .env.keycloak
+  chmod 600 .env.keycloak
+  echo "Created .env.keycloak with a generated local administrator password."
+else
+  echo "Preserving existing .env.keycloak."
+fi
+
+if [[ ! -f .env.local ]]; then
+  cp .env.example .env.local
+  chmod 600 .env.local
+  echo "Created .env.local from .env.example."
+  echo "ACTION REQUIRED: Edit .env.local and configure your Archestra key and model."
+else
+  echo "Preserving existing .env.local."
+fi
+
+
+echo
+echo "Setup preparation complete."
+echo "Next: configure .env.local, then run: docker compose config"
+
+===== 3. DOCKER COMPOSE KEYCLOAK CONFIGURATION =====
+7-    restart: unless-stopped
+8-    ports:
+9-      - "127.0.0.1:3000:3000"
+10-      - "127.0.0.1:9000:9000"
+11-    volumes:
+12-      - postgres-data:/var/lib/postgresql/data
+13-      - app-data:/app/data
+14-
+15:  keycloak:
+16:    image: quay.io/keycloak/keycloak:26.7.0
+17-    container_name: keycloak
+18-    restart: unless-stopped
+19-    command:
+20-      - start-dev
+21-      - --import-realm
+22-    env_file:
+23-      - .env.keycloak
+24-    environment:
+25-      KC_HTTP_ENABLED: "true"
+26-      KC_HEALTH_ENABLED: "true"
+27-      KC_METRICS_ENABLED: "true"
+28-    ports:
+29-      - "127.0.0.1:8080:8080"
+30-    volumes:
+31-      - keycloak-data:/opt/keycloak/data
+32-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-realm.json:ro
+33-
+34-volumes:
+35-  postgres-data:
+36-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-postgres-data
+37-  app-data:
+38-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-data
+39-  keycloak-data:
+40-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-keycloak-data
+
+===== 4. USER BOOTSTRAP SCRIPT =====
+#!/usr/bin/env bash
+set -euo pipefail
+
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
+
+# Load the same administrator credentials used to initialize Keycloak.
+# Keep .env.keycloak private; never print its contents.
+if [[ -f ".env.keycloak" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ".env.keycloak"
+  set +a
+fi
+
+ADMIN_USER="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}"
+
+DEVELOPER_USER="starter-developer"
+DEVELOPER_PASSWORD="StarterDev123!"
+VIEWER_USER="starter-viewer"
+VIEWER_PASSWORD="StarterView123!"
+
+KCADM="/opt/keycloak/bin/kcadm.sh"
+
+echo "Waiting for Keycloak..."
+for attempt in $(seq 1 60); do
+  if curl -fsS \
+    "${KEYCLOAK_URL}/realms/ai-starter/.well-known/openid-configuration" \
+    >/dev/null; then
+    break
+  fi
+
+  if [ "$attempt" -eq 60 ]; then
+    echo "ERROR: Keycloak did not become ready." >&2
+    exit 1
+  fi
+
+  sleep 2
+done
+
+docker exec keycloak "$KCADM" config credentials \
+  --server http://localhost:8080 \
+  --realm master \
+  --user "$ADMIN_USER" \
+  --password "$ADMIN_PASSWORD"
+
+ensure_user() {
+  local username="$1"
+  local password="$2"
+  local role="$3"
+
+  if ! docker exec keycloak "$KCADM" get users \
+    -r ai-starter -q "username=${username}" 2>/dev/null |
+    grep -q '"username"'; then
+    docker exec keycloak "$KCADM" create users \
+      -r ai-starter \
+      -s "username=${username}" \
+      -s enabled=true
+  fi
+
+  docker exec keycloak "$KCADM" set-password \
+    -r ai-starter \
+    --username "$username" \
+    --new-password "$password"
+
+  docker exec keycloak "$KCADM" add-roles \
+    -r ai-starter \
+    --uusername "$username" \
+    --rolename "$role"
+
+  echo "Configured ${username} with role ${role}."
+}
+
+ensure_user "$DEVELOPER_USER" "$DEVELOPER_PASSWORD" developer
+ensure_user "$VIEWER_USER" "$VIEWER_PASSWORD" viewer
+
+echo
+echo "Local Keycloak test users are ready."
+echo "Developer username: ${DEVELOPER_USER}"
+echo "Developer password: ${DEVELOPER_PASSWORD}"
+echo "Viewer username: ${VIEWER_USER}"
+echo "Viewer password: ${VIEWER_PASSWORD}"
+echo
+echo "These credentials are for local development only."
+
+===== 5. AUTHENTICATION ACTIONS =====
+"use server";
+
+import { signIn, signOut } from "@/auth";
+
+export async function signInWithKeycloak() {
+  await signIn("keycloak", {
+    redirectTo: "/",
+    prompt: "login",
+  });
+}
+
+export async function signOutOfApp() {
+  await signOut({
+    redirectTo: "/api/auth/keycloak-logout",
+  });
+}
+
+===== 6. AUTH CONFIGURATION =====
+import NextAuth from "next-auth";
+import Keycloak from "next-auth/providers/keycloak";
+
+interface KeycloakRoleClaims {
+  realm_access?: {
+    roles?: string[];
+  };
+}
+
+function extractRoles(value: unknown): string[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const claims = value as KeycloakRoleClaims;
+  const roles = claims.realm_access?.roles;
+
+  return Array.isArray(roles)
+    ? roles.filter((role: unknown): role is string => typeof role === "string")
+    : [];
+}
+
+function extractIdTokenRoles(idToken: string | undefined): string[] {
+  if (!idToken) {
+    return [];
+  }
+
+  try {
+    const payload = idToken.split(".")[1];
+
+    if (!payload) {
+      return [];
+    }
+
+    const claims = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    ) as unknown;
+
+    return extractRoles(claims);
+  } catch {
+    return [];
+  }
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
+
+  providers: [
+    Keycloak({
+      clientId: process.env.AUTH_KEYCLOAK_ID!,
+      clientSecret: process.env.AUTH_KEYCLOAK_SECRET!,
+      issuer: process.env.AUTH_KEYCLOAK_ISSUER!,
+    }),
+  ],
+
+  session: {
+    strategy: "jwt",
+  },
+
+  callbacks: {
+    async jwt({ token, profile, account }) {
+      if (profile) {
+        const profileRoles = extractRoles(profile);
+
+        token.roles =
+          profileRoles.length > 0
+            ? profileRoles
+            : extractIdTokenRoles(account?.id_token);
+      }
+
+      return token;
+    },
+
+    async session({ session, token }) {
+      if (session.user) {
+        const roles: string[] = Array.isArray(token.roles)
+          ? token.roles.filter(
+              (role: unknown): role is string => typeof role === "string",
+            )
+          : [];
+
+        session.user.roles = roles;
+      }
+
+      return session;
+    },
+  },
+});
+
+===== 7. EXISTING LOGOUT ENDPOINT =====
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const issuer = process.env.AUTH_KEYCLOAK_ISSUER;
+  const clientId = process.env.AUTH_KEYCLOAK_ID;
+
+  if (!issuer || !clientId) {
+    console.error(
+      "Keycloak logout configuration is missing.",
+    );
+
+    return NextResponse.json(
+      { error: "Keycloak logout is not configured." },
+      { status: 500 },
+    );
+  }
+
+  let issuerUrl: URL;
+
+  try {
+    issuerUrl = new URL(issuer);
+  } catch {
+    return NextResponse.json(
+      { error: "The Keycloak issuer URL is invalid." },
+      { status: 500 },
+    );
+  }
+
+  if (
+    issuerUrl.protocol !== "http:" &&
+    issuerUrl.protocol !== "https:"
+  ) {
+    return NextResponse.json(
+      { error: "The Keycloak issuer must use HTTP or HTTPS." },
+      { status: 500 },
+    );
+  }
+
+  const logoutUrl = new URL(
+    `${issuerUrl.pathname.replace(/\/+$/, "")}/protocol/openid-connect/logout`,
+    issuerUrl.origin,
+  );
+
+  const returnUrl = new URL("/", request.url);
+
+  logoutUrl.searchParams.set("client_id", clientId);
+  logoutUrl.searchParams.set(
+    "post_logout_redirect_uri",
+    returnUrl.toString(),
+  );
+
+  return NextResponse.redirect(logoutUrl);
+}
+
+===== 8. CURRENT SERVICES =====
+NAME        IMAGE                                                                                                    COMMAND                  SERVICE     CREATED             STATUS                       PORTS
+archestra   archestra/platform:1.4.0-rc.36@sha256:b673affbc4f6704ba181b815ab7ce8352397ee084702742d6ee93159551bac2f   "/docker-entrypoint.…"   archestra   About an hour ago   Up About an hour (healthy)   127.0.0.1:3000->3000/tcp, 127.0.0.1:9000->9000/tcp
+keycloak    quay.io/keycloak/keycloak:26.7.0                                                                         "/opt/keycloak/bin/k…"   keycloak    About an hour ago   Up About an hour             127.0.0.1:8080->8080/tcp
+
+===== 9. GIT STATUS =====
+ M README.md
+ M package.json
+ M pnpm-lock.yaml
+ M scripts/bootstrap-keycloak-users.sh
+ M src/app/actions.ts
+ M src/app/api/ai/test/route.ts
+?? src/app/api/auth/keycloak-logout/
+?? src/lib/ai-test-request.test.ts
+?? src/lib/ai-test-request.ts
+?? terminal.out
+
+===== REVIEW COMPLETE =====

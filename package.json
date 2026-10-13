@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:archestra": "node --env-file=.env.local --experimental-strip-types scripts/test-archestra.ts"
+    "test:archestra": "node --env-file=.env.local --experimental-strip-types scripts/test-archestra.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm test && pnpm typecheck && pnpm lint && pnpm build"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.91",
@@ -29,7 +32,8 @@
     "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.4"
   },
   "packageManager": "pnpm@11.25.0"
 }

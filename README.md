@@ -281,10 +281,13 @@ docker compose config --quiet
 # Print the resolved project name and volume names.
 docker compose config --format json | python3 -c '
 import json, sys
+
 config = json.load(sys.stdin)
-print("Project:", config.get("name"))
-for key, volume in config.get("volumes", {}).items():
-    print(f"{key} -> {volume.get(\"name\")}")
+print("Compose project:", config["name"])
+
+for logical, volume in config.get("volumes", {}).items():
+    name = volume.get("name", logical)
+    print(f"{logical}: {name}")
 '
 
 # List configured services.
@@ -384,7 +387,7 @@ only.
 
 ``` bash
 bash -n scripts/bootstrap-keycloak-users.sh
-./scripts/bootstrap-keycloak-users.sh
+bash scripts/bootstrap-keycloak-users.sh
 ```
 
 The script uses Keycloak's `kcadm.sh` inside the `keycloak` container
@@ -543,7 +546,7 @@ usernames/passwords in the Next.js application.
 
 ``` bash
 bash -n scripts/bootstrap-keycloak-users.sh
-./scripts/bootstrap-keycloak-users.sh
+bash scripts/bootstrap-keycloak-users.sh
 ```
 
 6.  Sign in to the application at `http://localhost:3001` and test each

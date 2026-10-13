@@ -1,0 +1,337 @@
+
+========== 1. Realm defaults and required actions ==========
+{
+  "realm": "ai-starter",
+  "resetPasswordAllowed": false,
+  "requiredActions": [],
+  "users": []
+}
+
+========== 2. User bootstrap script ==========
+#!/usr/bin/env bash
+set -euo pipefail
+
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
+REALM="ai-starter"
+CLIENT_ID="ai-starter-web"
+KCADM="/opt/keycloak/bin/kcadm.sh"
+
+if [[ ! -f ".env.keycloak" ]]; then
+  echo "ERROR: .env.keycloak was not found." >&2
+  exit 1
+fi
+
+set -a
+source ".env.keycloak"
+set +a
+
+ADMIN_USER="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD:-}"
+
+if [[ -z "$ADMIN_PASSWORD" ]]; then
+  echo "ERROR: Keycloak administrator password is not configured." >&2
+  exit 1
+fi
+
+echo "Waiting for Keycloak..."
+ready=false
+
+for attempt in $(seq 1 60); do
+  if curl -fsS \
+    "${KEYCLOAK_URL}/realms/${REALM}/.well-known/openid-configuration" \
+    >/dev/null; then
+    ready=true
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$ready" != "true" ]]; then
+  echo "ERROR: Keycloak did not become ready." >&2
+  exit 1
+fi
+
+docker exec keycloak "$KCADM" config credentials \
+  --server http://localhost:8080 \
+  --realm master \
+  --user "$ADMIN_USER" \
+  --password "$ADMIN_PASSWORD" >/dev/null
+
+echo "Looking up OIDC client..."
+
+CLIENT_JSON="$(
+  docker exec keycloak "$KCADM" get clients \
+    -r "$REALM" -q "clientId=${CLIENT_ID}"
+)"
+
+CLIENT_UUID="$(
+  printf '%s' "$CLIENT_JSON" |
+    node -e '
+      let input = "";
+      process.stdin.on("data", c => input += c);
+      process.stdin.on("end", () => {
+        const clients = JSON.parse(input);
+        const client = clients.find(c => c.clientId === "ai-starter-web");
+        if (!client) {
+          console.error("OIDC client ai-starter-web was not found.");
+          process.exit(1);
+        }
+        process.stdout.write(client.id);
+      });
+    '
+)"
+
+docker exec keycloak "$KCADM" update "clients/${CLIENT_UUID}" \
+  -r "$REALM" \
+  -s 'redirectUris=["http://localhost:3001/*"]' \
+  -s 'webOrigins=["http://localhost:3001"]' \
+  >/dev/null
+
+CLIENT_JSON="$(
+  docker exec keycloak "$KCADM" get "clients/${CLIENT_UUID}" -r "$REALM"
+)"
+
+printf '%s' "$CLIENT_JSON" |
+  node -e '
+    let input = "";
+    process.stdin.on("data", c => input += c);
+    process.stdin.on("end", () => {
+      const c = JSON.parse(input);
+      const valid =
+        c.enabled === true &&
+        (c.redirectUris || []).includes("http://localhost:3001/*") &&
+        (c.webOrigins || []).includes("http://localhost:3001") &&
+        c.attributes?.["post.logout.redirect.uris"] ===
+          "http://localhost:3001/*";
+
+      if (!valid) {
+        console.error("ERROR: Keycloak client redirect configuration is incomplete.");
+        process.exit(1);
+      }
+
+      console.log("OIDC login and logout redirect configuration verified.");
+    });
+  '
+
+ensure_user() {
+  local username="$1"
+  local password="$2"
+  local role="$3"
+  local user_json
+  local user_id
+
+  user_json="$(
+    docker exec keycloak "$KCADM" get users \
+      -r "$REALM" -q "username=${username}"
+  )"
+
+  user_id="$(
+    printf '%s' "$user_json" |
+      USERNAME="$username" node -e '
+        let input = "";
+        process.stdin.on("data", c => input += c);
+        process.stdin.on("end", () => {
+          const users = JSON.parse(input);
+          const user = users.find(u => u.username === process.env.USERNAME);
+          if (user) process.stdout.write(user.id);
+        });
+      '
+  )"
+
+  if [[ -z "$user_id" ]]; then
+    echo "Creating demo user: ${username}"
+
+    docker exec keycloak "$KCADM" create users \
+      -r "$REALM" \
+      -s "username=${username}" \
+      -s enabled=true \
+      >/dev/null
+  else
+    echo "Found existing demo user: ${username}"
+  fi
+
+  docker exec keycloak "$KCADM" set-password \
+    -r "$REALM" \
+    --username "$username" \
+    --new-password "$password" \
+    >/dev/null
+
+  user_json="$(
+    docker exec keycloak "$KCADM" get users \
+      -r "$REALM" -q "username=${username}"
+  )"
+
+  printf '%s' "$user_json" |
+    USERNAME="$username" node -e '
+      let input = "";
+      process.stdin.on("data", c => input += c);
+      process.stdin.on("end", () => {
+        const users = JSON.parse(input);
+        const user = users.find(u => u.username === process.env.USERNAME);
+        if (!user) {
+          console.error("ERROR: User lookup failed.");
+          process.exit(1);
+        }
+
+        const actions = user.requiredActions || [];
+        if (actions.includes("UPDATE_PASSWORD")) {
+          console.error(
+            "ERROR: UPDATE_PASSWORD is assigned to " + user.username +
+            ". Remove that action without changing other required actions."
+          );
+          process.exit(2);
+        }
+      });
+    '
+
+  if ! docker exec keycloak "$KCADM" get roles \
+    -r "$REALM" --uusername "$username" 2>/dev/null |
+    grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${role}\""; then
+    docker exec keycloak "$KCADM" add-roles \
+      -r "$REALM" \
+      --uusername "$username" \
+      --rolename "$role" \
+      >/dev/null
+  fi
+
+  echo "Configured ${username} (role: ${role}; default development password set)."
+}
+
+ensure_user "starter-developer" "StarterDev123!" "developer"
+ensure_user "starter-viewer" "StarterView123!" "viewer"
+
+echo
+echo "Keycloak bootstrap completed successfully."
+echo "Login and logout redirect configuration verified."
+echo "No containers, volumes, or realms were recreated."
+
+========== 3. Initial setup script ==========
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+# Keep the Docker Compose project name aligned with package.json.
+if ! command -v node >/dev/null 2>&1; then
+  echo "ERROR: Node.js is required to read the package name." >&2
+  exit 1
+fi
+
+PACKAGE_NAME="$(node -p "require('./package.json').name")"
+if [[ -z "$PACKAGE_NAME" ]]; then
+  echo "ERROR: package.json does not define a package name." >&2
+  exit 1
+fi
+
+export PACKAGE_NAME
+node <<'NODE'
+const fs = require("node:fs");
+
+const envPath = ".env";
+const packageName = process.env.PACKAGE_NAME;
+const lines = fs.existsSync(envPath)
+  ? fs.readFileSync(envPath, "utf8").split(/\r?\n/)
+  : [];
+
+const matching = lines
+  .map((line, index) => ({ line, index }))
+  .filter(({ line }) => /^\s*COMPOSE_PROJECT_NAME\s*=/.test(line));
+
+if (matching.length > 1) {
+  throw new Error("Multiple COMPOSE_PROJECT_NAME entries found in .env");
+}
+
+if (matching.length === 1) {
+  lines[matching[0].index] = `COMPOSE_PROJECT_NAME=${packageName}`;
+} else {
+  while (lines.length && lines[lines.length - 1] === "") lines.pop();
+  lines.push(`COMPOSE_PROJECT_NAME=${packageName}`);
+}
+
+fs.writeFileSync(envPath, lines.join("\n") + "\n", { mode: 0o600 });
+NODE
+
+echo "Docker Compose project name: ${PACKAGE_NAME}"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: Docker is required. Install Docker Desktop first." >&2
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "ERROR: Docker is not running. Start Docker Desktop and retry." >&2
+  exit 1
+fi
+
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "ERROR: openssl is required to generate a local password." >&2
+  exit 1
+fi
+
+if [[ ! -f .env.keycloak ]]; then
+  umask 077
+  printf 'KC_BOOTSTRAP_ADMIN_USERNAME=admin\nKC_BOOTSTRAP_ADMIN_PASSWORD=%s\n' \
+    "$(openssl rand -hex 32)" > .env.keycloak
+  chmod 600 .env.keycloak
+  echo "Created .env.keycloak with a generated local administrator password."
+else
+  echo "Preserving existing .env.keycloak."
+fi
+
+if [[ ! -f .env.local ]]; then
+  cp .env.example .env.local
+  chmod 600 .env.local
+  echo "Created .env.local from .env.example."
+  echo "ACTION REQUIRED: Edit .env.local and configure your Archestra key and model."
+else
+  echo "Preserving existing .env.local."
+fi
+
+
+echo
+echo "Setup preparation complete."
+echo "Next: configure .env.local, then run: docker compose config"
+
+========== 4. Keycloak Compose configuration ==========
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    container_name: keycloak
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+    env_file:
+      - .env.keycloak
+    environment:
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-realm.json:ro
+
+volumes:
+
+========== 5. Relevant realm export references ==========
+6:  "resetPasswordAllowed": false,
+29:      "clientId": "ai-starter-web",
+
+========== 6. Current modified files ==========
+ M README.md
+ M package.json
+ M pnpm-lock.yaml
+ M scripts/bootstrap-keycloak-users.sh
+ M src/app/actions.ts
+ M src/app/api/ai/test/route.ts
+ M src/app/page.tsx
+?? src/app/api/auth/keycloak-logout/
+?? src/components/
+?? src/lib/ai-test-request.test.ts
+?? src/lib/ai-test-request.ts
+?? terminal-auth-diagnostic.out
+?? terminal-auth-review.out
+?? terminal-keycloak-initial-review.out
+?? terminal.out
