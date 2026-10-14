@@ -1,0 +1,2 @@
+node scripts/lint-commit-msg.mjs "$1"
+

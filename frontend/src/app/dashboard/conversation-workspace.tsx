@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 
 interface Conversation {
   id: string;
@@ -431,7 +432,11 @@ export function ConversationWorkspace({
                   </div>
 
                   <div className="chatgpt-message-content">
-                    <div className="chatgpt-message-text">{msg.content}</div>
+                    {isUser ? (
+                      <div className="chatgpt-message-text">{msg.content}</div>
+                    ) : (
+                      <MarkdownRenderer content={msg.content} />
+                    )}
                     {!isUser && (
                       <button
                         type="button"
