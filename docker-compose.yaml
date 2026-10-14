@@ -3,7 +3,7 @@ name: ${COMPOSE_PROJECT_NAME:-ai-starter}
 services:
   archestra:
     image: archestra/platform:1.4.0-rc.36@sha256:b673affbc4f6704ba181b815ab7ce8352397ee084702742d6ee93159551bac2f
-    container_name: archestra
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-archestra
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -16,7 +16,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0
-    container_name: keycloak
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-keycloak
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -38,7 +38,7 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: ai-starter-postgres
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-postgres
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -63,7 +63,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: ai-starter-backend
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-backend
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -82,6 +82,7 @@ services:
       AUTH_KEYCLOAK_INTERNAL_URL: "${AUTH_KEYCLOAK_INTERNAL_URL:-http://keycloak:8080/realms/ai-starter}"
       ARCHESTRA_BASE_URL: "${DOCKER_ARCHESTRA_BASE_URL:-http://archestra:9000/v1/openrouter}"
       DATABASE_URL: "${DOCKER_DATABASE_URL:-postgresql://aistarter:aistarter_local_secret@postgres:5432/aistarter_db}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318/v1/traces}"
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3001}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_FORMAT: "${LOG_FORMAT:-json}"
@@ -101,7 +102,7 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: ai-starter-frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-frontend
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -131,7 +132,7 @@ services:
   # Observability Stack (activated with profile: monitoring or full)
   loki:
     image: grafana/loki:3.3.0
-    container_name: ai-starter-loki
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-loki
     restart: unless-stopped
     profiles: ["full", "monitoring"]
     command: -config.file=/etc/loki/local-config.yaml
@@ -149,7 +150,7 @@ services:
 
   promtail:
     image: grafana/promtail:3.3.0
-    container_name: ai-starter-promtail
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-promtail
     user: "0:0"
     restart: unless-stopped
     profiles: ["full", "monitoring"]
@@ -163,7 +164,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.54.1
-    container_name: ai-starter-prometheus
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-prometheus
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -178,9 +179,31 @@ services:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
 
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo-config.yaml"]
+    labels:
+      logging: "promtail"
+    profiles: ["full", "monitoring"]
+    ports:
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./monitoring/tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml:ro
+      - tempo-data:/tmp/tempo
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3200/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   grafana:
     image: grafana/grafana:11.4.0
-    container_name: ai-starter-grafana
+    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-grafana
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -203,19 +226,23 @@ services:
         condition: service_healthy
       prometheus:
         condition: service_started
+      tempo:
+        condition: service_healthy
 
 volumes:
   postgres-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-postgres-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-postgres-data
   app-postgres-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-postgres-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-app-postgres-data
   app-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-app-data
   keycloak-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-keycloak-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-keycloak-data
   loki-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-loki-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-loki-data
   prometheus-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-prometheus-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-prometheus-data
+  tempo-data:
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-tempo-data
   grafana-data:
-    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-grafana-data
+    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-grafana-data

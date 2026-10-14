@@ -1,7 +1,8 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
+import helmet from "helmet";
 import { guardAuth, guardRoles } from "./middleware/rbac.js";
 import { applyRateLimit, aiRateLimiter, apiRateLimiter } from "./middleware/rate-limit.js";
-import { validateAiTestRequest } from "./lib/ai-test-request.js";
+import { validateAiTestRequest, createConversationSchema } from "./lib/ai-test-request.js";
 import {
   isArchestraConfigured,
   runConnectionTest,
@@ -20,6 +21,67 @@ import {
   getDatabaseStats,
   clearAllConversations,
 } from "./db/repository.js";
+import {
+  getPrometheusMetrics,
+  getMetricsContentType,
+  httpRequestsTotal,
+  httpRequestDurationSeconds,
+  aiRequestsTotal,
+  aiRequestDurationSeconds,
+} from "./lib/metrics.js";
+import {
+  getTracer,
+  extractTraceContext,
+  injectTraceContext,
+  traceAsync,
+  trace,
+  context,
+  SpanKind,
+  SpanStatusCode,
+} from "./lib/tracing.js";
+
+const helmetMiddleware = helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+});
+
+export class PayloadTooLargeError extends Error {
+  readonly statusCode = 413;
+  constructor(message = "Payload too large. Maximum allowed size is 1MB.") {
+    super(message);
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+const MAX_JSON_BODY_BYTES = 1024 * 1024; // 1 MB
+
+function normalizeRouteLabel(pathname: string): string {
+  if (pathname.startsWith("/api/conversations/")) {
+    const parts = pathname.split("/");
+    if (parts.length === 5 && parts[4] === "messages") {
+      return "/api/conversations/:id/messages";
+    }
+    if (parts.length === 4) {
+      return "/api/conversations/:id";
+    }
+  }
+  if (
+    pathname === "/api/conversations" ||
+    pathname === "/api/ai/test" ||
+    pathname === "/api/admin/status" ||
+    pathname === "/api/admin/conversations/clear" ||
+    pathname === "/healthz" ||
+    pathname === "/health" ||
+    pathname === "/readyz" ||
+    pathname === "/openapi.json" ||
+    pathname === "/docs" ||
+    pathname === "/swagger" ||
+    pathname === "/metrics"
+  ) {
+    return pathname;
+  }
+  return "other";
+}
 
 function getAllowedOrigins(): string[] {
   const env = getBackendEnv();
@@ -65,7 +127,11 @@ function setCorsHeaders(res: ServerResponse, origin?: string): void {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, x-user-roles, x-user-id, x-user-email, x-request-id",
+    "Content-Type, Authorization, x-user-roles, x-user-id, x-user-email, x-request-id, traceparent, tracestate, x-trace-id",
+  );
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    "x-request-id, x-trace-id, traceparent",
   );
   res.setHeader("Access-Control-Allow-Credentials", "true");
 }
@@ -75,12 +141,24 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+async function readJsonBody(
+  req: IncomingMessage,
+  maxBytes = MAX_JSON_BODY_BYTES,
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = "";
+    let receivedBytes = 0;
+
     req.on("data", (chunk: Buffer) => {
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxBytes) {
+        req.destroy();
+        reject(new PayloadTooLargeError());
+        return;
+      }
       body += chunk.toString("utf8");
     });
+
     req.on("end", () => {
       if (!body.trim()) {
         resolve({});
@@ -92,6 +170,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
         reject(err);
       }
     });
+
     req.on("error", reject);
   });
 }
@@ -99,45 +178,118 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 export function createBackendServer(): http.Server {
   return http.createServer(async (req, res) => {
     const startTime = performance.now();
-    const origin = req.headers.origin;
-    setCorsHeaders(res, origin);
 
-    // 1. Correlation ID
-    const incomingReqId = req.headers["x-request-id"];
-    const reqId =
-      typeof incomingReqId === "string" && incomingReqId.trim().length > 0
-        ? incomingReqId
-        : generateRequestId();
-
-    res.setHeader("x-request-id", reqId);
-
+    // 0. Distributed Tracing: Extract W3C Context and start HTTP server span
+    const incomingCtx = extractTraceContext(req.headers);
+    const tracer = getTracer();
     const pathname = (req.url ?? "/").split("?")[0] || "/";
-    const reqLogger: Logger = logger.child({ reqId, method: req.method, path: pathname });
+    const route = normalizeRouteLabel(pathname);
 
-    // Handle preflight
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
+    const serverSpan = tracer.startSpan(
+      `${req.method || "HTTP"} ${route}`,
+      {
+        kind: SpanKind.SERVER,
+        attributes: {
+          "http.method": req.method || "UNKNOWN",
+          "http.target": pathname,
+          "http.route": route,
+        },
+      },
+      incomingCtx,
+    );
 
-    // Log response completion with appropriate severity for observability
-    res.on("finish", () => {
-      const durationMs = Math.round(performance.now() - startTime);
-      const logData = {
-        statusCode: res.statusCode,
-        durationMs,
-      };
-      if (res.statusCode >= 500) {
-        reqLogger.error(`${req.method} ${pathname} ${res.statusCode}`, logData);
-      } else if (res.statusCode >= 400) {
-        reqLogger.warn(`${req.method} ${pathname} ${res.statusCode}`, logData);
-      } else {
-        reqLogger.info(`${req.method} ${pathname} ${res.statusCode}`, logData);
+    const reqCtx = trace.setSpan(incomingCtx, serverSpan);
+
+    return context.with(reqCtx, async () => {
+      const spanContext = serverSpan.spanContext();
+      const traceId = spanContext.traceId;
+
+      // Apply OWASP Security Headers via Helmet
+      if (typeof res.setHeader === "function") {
+        if (typeof res.removeHeader !== "function") {
+          (res as unknown as { removeHeader: (name: string) => void }).removeHeader = () => {
+            // Fallback if not implemented on mock
+          };
+        }
+        await new Promise<void>((resolve) => helmetMiddleware(req, res, () => resolve()));
       }
-    });
 
-    // 2. Health & Readiness Probes (bypass general rate limits)
+      const origin = req.headers.origin;
+      setCorsHeaders(res, origin);
+
+      // 1. Correlation ID
+      const incomingReqId = req.headers["x-request-id"];
+      const reqId =
+        typeof incomingReqId === "string" && incomingReqId.trim().length > 0
+          ? incomingReqId
+          : generateRequestId();
+
+      res.setHeader("x-request-id", reqId);
+      if (traceId) {
+        res.setHeader("x-trace-id", traceId);
+        const traceHeaders: Record<string, string> = {};
+        injectTraceContext(traceHeaders, reqCtx);
+        if (traceHeaders.traceparent) {
+          res.setHeader("traceparent", traceHeaders.traceparent);
+        }
+      }
+
+      serverSpan.setAttribute("http.request_id", reqId);
+
+      const reqLogger: Logger = logger.child({ reqId, traceId, method: req.method, path: pathname });
+
+      // Handle preflight
+      if (req.method === "OPTIONS") {
+        serverSpan.setStatus({ code: SpanStatusCode.OK });
+        serverSpan.end();
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      // Log response completion with appropriate severity and record Prometheus metrics & OTel span
+      res.on("finish", () => {
+        const durationSeconds = (performance.now() - startTime) / 1000;
+        const durationMs = Math.round(durationSeconds * 1000);
+        const logData = {
+          statusCode: res.statusCode,
+          durationMs,
+        };
+        if (res.statusCode >= 500) {
+          reqLogger.error(`${req.method} ${pathname} ${res.statusCode}`, logData);
+        } else if (res.statusCode >= 400) {
+          reqLogger.warn(`${req.method} ${pathname} ${res.statusCode}`, logData);
+        } else {
+          reqLogger.info(`${req.method} ${pathname} ${res.statusCode}`, logData);
+        }
+
+        try {
+          serverSpan.setAttribute("http.status_code", res.statusCode);
+          if (res.statusCode >= 500) {
+            serverSpan.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: `HTTP ${res.statusCode}`,
+            });
+          } else {
+            serverSpan.setStatus({ code: SpanStatusCode.OK });
+          }
+          serverSpan.end();
+        } catch {
+          // Ignore span finish errors
+        }
+
+        try {
+          const route = normalizeRouteLabel(pathname);
+          const method = req.method || "UNKNOWN";
+          const statusCode = res.statusCode.toString();
+          httpRequestsTotal.inc({ method, route, status_code: statusCode });
+          httpRequestDurationSeconds.observe({ method, route, status_code: statusCode }, durationSeconds);
+        } catch {
+          // Suppress any metrics recording error to protect request lifecycle
+        }
+      });
+
+    // 2. Health, Readiness & Metrics Probes (bypass general rate limits)
     if (req.method === "GET" && (pathname === "/healthz" || pathname === "/health" || pathname === "/api/health")) {
       sendJson(res, 200, getLivenessReport());
       return;
@@ -146,6 +298,20 @@ export function createBackendServer(): http.Server {
     if (req.method === "GET" && pathname === "/readyz") {
       const { statusCode, report } = await getReadinessReport();
       sendJson(res, statusCode, report);
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/metrics") {
+      try {
+        const metrics = await getPrometheusMetrics();
+        res.writeHead(200, { "Content-Type": getMetricsContentType() });
+        res.end(metrics);
+      } catch (err) {
+        reqLogger.error("Failed to export Prometheus metrics", {
+          err: err instanceof Error ? err.message : String(err),
+        });
+        sendJson(res, 500, { error: "Failed to export metrics" });
+      }
       return;
     }
 
@@ -258,16 +424,25 @@ export function createBackendServer(): http.Server {
       let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch {
+      } catch (err) {
+        if (err instanceof PayloadTooLargeError) {
+          sendJson(res, 413, { error: err.message });
+          return;
+        }
         sendJson(res, 400, { error: "Request body must be valid JSON." });
         return;
       }
 
-      const titleRaw =
-        typeof body === "object" && body !== null && "title" in body && typeof body.title === "string"
-          ? body.title.trim()
-          : "New Conversation";
-      const title = titleRaw.slice(0, 255) || "New Conversation";
+      let title = "New Conversation";
+      if (typeof body === "object" && body !== null && "title" in body) {
+        const parsed = createConversationSchema.safeParse(body);
+        if (!parsed.success) {
+          sendJson(res, 400, { error: parsed.error.issues[0]?.message ?? "Invalid title." });
+          return;
+        }
+        title = parsed.data.title;
+      }
+
       const userId = user.id || user.email || "unknown";
 
       try {
@@ -370,7 +545,11 @@ export function createBackendServer(): http.Server {
       let body: unknown;
       try {
         body = await readJsonBody(req);
-      } catch {
+      } catch (err) {
+        if (err instanceof PayloadTooLargeError) {
+          sendJson(res, 413, { error: err.message });
+          return;
+        }
         sendJson(res, 400, { error: "Request body must be valid JSON." });
         return;
       }
@@ -411,8 +590,28 @@ export function createBackendServer(): http.Server {
         return;
       }
 
+      const aiStartTime = performance.now();
+      const model = getBackendEnv().ARCHESTRA_MODEL || "unknown";
+
       try {
-        const result = await runConnectionTest(validation.prompt);
+        const result = await traceAsync("ai.archestra_gateway", async (span) => {
+          span.setAttribute("ai.provider", "archestra");
+          span.setAttribute("ai.model", model);
+          span.setAttribute("ai.prompt.length", validation.prompt.length);
+          if (validation.conversationId) {
+            span.setAttribute("conversation.id", validation.conversationId);
+          }
+          return runConnectionTest(validation.prompt);
+        });
+
+        const aiDurationSeconds = (performance.now() - aiStartTime) / 1000;
+        try {
+          aiRequestsTotal.inc({ status: "success", model });
+          aiRequestDurationSeconds.observe({ status: "success", model }, aiDurationSeconds);
+        } catch {
+          // Ignore metrics collection errors
+        }
+
         reqLogger.info("AI connection test completed successfully");
 
         if (validation.conversationId) {
@@ -430,6 +629,14 @@ export function createBackendServer(): http.Server {
           ...(validation.conversationId ? { conversationId: validation.conversationId } : {}),
         });
       } catch (error) {
+        const aiDurationSeconds = (performance.now() - aiStartTime) / 1000;
+        try {
+          aiRequestsTotal.inc({ status: "error", model });
+          aiRequestDurationSeconds.observe({ status: "error", model }, aiDurationSeconds);
+        } catch {
+          // Ignore metrics collection errors
+        }
+
         reqLogger.error("AI connection test failed.", {
           err: error instanceof Error ? error.message : String(error),
         });
@@ -442,5 +649,6 @@ export function createBackendServer(): http.Server {
 
     // Default 404
     sendJson(res, 404, { error: `Not found: ${req.method} ${pathname}` });
+    });
   });
 }

@@ -22,6 +22,20 @@ export function getDb() {
   return dbInstance;
 }
 
+export async function closeDb(): Promise<void> {
+  if (client) {
+    try {
+      await client.end({ timeout: 5 });
+    } catch {
+      // Ignore errors on pool close
+    } finally {
+      client = null;
+      dbInstance = null;
+    }
+  }
+}
+
 export { schema };
 export * from "./schema.js";
+
 

@@ -32,25 +32,17 @@ async function AdminContent() {
   return (
     <div className="admin-page-container">
       <header className="chatgpt-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link className="brand" href="/" aria-label="Go to dashboard">
-            <span className="brand-mark small">AI</span>
-            <span className="brand-title">{appConfig.displayName}</span>
-          </Link>
-          <span className="admin-tag-badge">Admin</span>
-        </div>
+        <Link className="brand" href="/" aria-label="Go to dashboard">
+          <span className="brand-mark small">AI</span>
+          <span className="brand-title">{appConfig.displayName}</span>
+        </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/" className="back-chat-link">
-            ← Back to Chat
-          </Link>
-          <UserAvatarDropdown
-            user={session.user}
-            roles={roles}
-            isAdmin={true}
-            isInAdminPage={true}
-          />
-        </div>
+        <UserAvatarDropdown
+          user={session.user}
+          roles={roles}
+          isAdmin={true}
+          isInAdminPage={true}
+        />
       </header>
 
       <AdminConsole user={session.user} roles={roles} />

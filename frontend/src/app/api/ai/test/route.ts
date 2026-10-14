@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 import { getFrontendEnv } from "@/lib/env";
+import { getOrCreateTraceparent, extractTraceId } from "@/lib/tracing";
 
 const BACKEND_URL = getFrontendEnv().BACKEND_URL;
 
 export async function POST(request: Request) {
+  const traceparent = getOrCreateTraceparent(request.headers);
+  const traceId = extractTraceId(traceparent);
   const reqId = request.headers.get("x-request-id") || crypto.randomUUID();
-  const reqLogger = logger.child({ reqId, path: "/api/ai/test" });
+  const reqLogger = logger.child({ reqId, traceId, path: "/api/ai/test" });
 
   const session = await auth();
 
@@ -15,7 +18,14 @@ export async function POST(request: Request) {
     reqLogger.warn("Unauthorized attempt on /api/ai/test");
     return NextResponse.json(
       { error: "Authentication is required." },
-      { status: 401, headers: { "x-request-id": reqId } },
+      {
+        status: 401,
+        headers: {
+          "x-request-id": reqId,
+          traceparent,
+          ...(traceId ? { "x-trace-id": traceId } : {}),
+        },
+      },
     );
   }
 
@@ -25,13 +35,22 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { error: "Request body must be valid JSON." },
-      { status: 400, headers: { "x-request-id": reqId } },
+      {
+        status: 400,
+        headers: {
+          "x-request-id": reqId,
+          traceparent,
+          ...(traceId ? { "x-trace-id": traceId } : {}),
+        },
+      },
     );
   }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-request-id": reqId,
+    traceparent,
+    ...(traceId ? { "x-trace-id": traceId } : {}),
   };
 
   if (session.accessToken) {
@@ -74,7 +93,11 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(data, {
       status: backendResponse.status,
-      headers: { "x-request-id": reqId },
+      headers: {
+        "x-request-id": reqId,
+        traceparent,
+        ...(traceId ? { "x-trace-id": traceId } : {}),
+      },
     });
   } catch (error) {
     reqLogger.error("Failed to reach backend API server at " + BACKEND_URL, {
@@ -85,7 +108,14 @@ export async function POST(request: Request) {
         error:
           "Could not reach the backend API server. Make sure the backend is running on port 4000.",
       },
-      { status: 502, headers: { "x-request-id": reqId } },
+      {
+        status: 502,
+        headers: {
+          "x-request-id": reqId,
+          traceparent,
+          ...(traceId ? { "x-trace-id": traceId } : {}),
+        },
+      },
     );
   }
 }

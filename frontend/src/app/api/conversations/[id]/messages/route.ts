@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 import { getFrontendEnv } from "@/lib/env";
+import { getOrCreateTraceparent, extractTraceId } from "@/lib/tracing";
 
 const BACKEND_URL = getFrontendEnv().BACKEND_URL;
 
-function buildHeaders(session: { accessToken?: string; user?: { roles?: string[]; id?: string; email?: string | null } }, reqId: string): Record<string, string> {
+function buildHeaders(
+  session: { accessToken?: string; user?: { roles?: string[]; id?: string; email?: string | null } },
+  reqId: string,
+  traceparent: string,
+  traceId: string | null,
+): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-request-id": reqId,
+    traceparent,
+    ...(traceId ? { "x-trace-id": traceId } : {}),
   };
 
   if (session.accessToken) {
@@ -35,28 +43,41 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const traceparent = getOrCreateTraceparent(request.headers);
+  const traceId = extractTraceId(traceparent);
   const reqId = request.headers.get("x-request-id") || crypto.randomUUID();
-  const reqLogger = logger.child({ reqId, path: `/api/conversations/${id}/messages` });
+  const reqLogger = logger.child({ reqId, traceId, path: `/api/conversations/${id}/messages` });
 
   const session = await auth();
   if (!session?.user) {
     reqLogger.warn("Unauthorized attempt on conversation messages");
     return NextResponse.json(
       { error: "Authentication is required." },
-      { status: 401, headers: { "x-request-id": reqId } },
+      {
+        status: 401,
+        headers: {
+          "x-request-id": reqId,
+          traceparent,
+          ...(traceId ? { "x-trace-id": traceId } : {}),
+        },
+      },
     );
   }
 
   try {
     const res = await fetch(`${BACKEND_URL}/api/conversations/${encodeURIComponent(id)}/messages`, {
       method: "GET",
-      headers: buildHeaders(session, reqId),
+      headers: buildHeaders(session, reqId, traceparent, traceId),
     });
 
     const data = (await res.json()) as unknown;
     return NextResponse.json(data, {
       status: res.status,
-      headers: { "x-request-id": reqId },
+      headers: {
+        "x-request-id": reqId,
+        traceparent,
+        ...(traceId ? { "x-trace-id": traceId } : {}),
+      },
     });
   } catch (err) {
     reqLogger.error("Failed to fetch conversation messages from backend", {
@@ -64,7 +85,14 @@ export async function GET(
     });
     return NextResponse.json(
       { error: "Could not reach backend API server." },
-      { status: 502, headers: { "x-request-id": reqId } },
+      {
+        status: 502,
+        headers: {
+          "x-request-id": reqId,
+          traceparent,
+          ...(traceId ? { "x-trace-id": traceId } : {}),
+        },
+      },
     );
   }
 }

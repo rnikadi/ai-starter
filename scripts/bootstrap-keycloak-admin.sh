@@ -29,10 +29,9 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker inspect keycloak >/dev/null 2>&1; then
-  printf 'ERROR: A container named keycloak was not found.\n' >&2
-  exit 1
-fi
+kc_exec() {
+  docker compose exec -T keycloak "$@"
+}
 
 printf 'Waiting for Keycloak...\n'
 ready=false
@@ -52,14 +51,14 @@ if [[ "$ready" != "true" ]]; then
   exit 1
 fi
 
-docker exec keycloak "$KCADM" config credentials \
+kc_exec "$KCADM" config credentials \
   --server http://localhost:8080 \
   --realm master \
   --user "$ADMIN_USER" \
   --password "$ADMIN_PASSWORD" \
   >/dev/null
 
-if ! docker exec keycloak "$KCADM" get "roles/admin" \
+if ! kc_exec "$KCADM" get "roles/admin" \
   -r "$REALM" >/dev/null 2>&1; then
   printf 'ERROR: The admin realm role does not exist in realm %s.\n' "$REALM" >&2
   exit 1
@@ -69,7 +68,7 @@ lookup_user_id() {
   local user_json
 
   user_json="$(
-    docker exec keycloak "$KCADM" get users \
+    kc_exec "$KCADM" get users \
       -r "$REALM" \
       -q "username=${USERNAME}"
   )"
@@ -91,7 +90,7 @@ USER_ID="$(lookup_user_id)"
 if [[ -z "$USER_ID" ]]; then
   printf 'Creating local-development admin account...\n'
 
-  docker exec keycloak "$KCADM" create users \
+  kc_exec "$KCADM" create users \
     -r "$REALM" \
     -s "username=${USERNAME}" \
     -s enabled=true \
@@ -104,7 +103,7 @@ if [[ -z "$USER_ID" ]]; then
     exit 1
   fi
 
-  docker exec keycloak "$KCADM" set-password \
+  kc_exec "$KCADM" set-password \
     -r "$REALM" \
     --username "$USERNAME" \
     --new-password "$STARTER_ADMIN_PASSWORD"
@@ -114,7 +113,7 @@ else
   printf 'Found existing admin account; preserving its password.\n'
 
   if [[ "${STARTER_ADMIN_RESET_PASSWORD:-false}" == "true" ]]; then
-    docker exec keycloak "$KCADM" set-password \
+    kc_exec "$KCADM" set-password \
       -r "$REALM" \
       --username "$USERNAME" \
       --new-password "$STARTER_ADMIN_PASSWORD"
@@ -123,7 +122,7 @@ else
   fi
 fi
 
-docker exec keycloak "$KCADM" update "users/${USER_ID}" \
+kc_exec "$KCADM" update "users/${USER_ID}" \
   -r "$REALM" \
   -s enabled=true \
   >/dev/null
@@ -132,7 +131,7 @@ has_admin_role() {
   local roles_json
 
   roles_json="$(
-    docker exec keycloak "$KCADM" get-roles \
+    kc_exec "$KCADM" get-roles \
       -r "$REALM" \
       --uusername "$USERNAME"
   )" || return 1
@@ -150,7 +149,7 @@ has_admin_role() {
 }
 
 if ! has_admin_role; then
-  docker exec keycloak "$KCADM" add-roles \
+  kc_exec "$KCADM" add-roles \
     -r "$REALM" \
     --uusername "$USERNAME" \
     --rolename admin \

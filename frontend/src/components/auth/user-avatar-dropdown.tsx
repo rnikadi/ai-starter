@@ -40,7 +40,6 @@ function getInitials(name?: string | null, email?: string | null): string {
 
 export function UserAvatarDropdown({
   user,
-  roles,
   isAdmin,
   isInAdminPage = false,
 }: UserAvatarDropdownProps) {
@@ -90,68 +89,35 @@ export function UserAvatarDropdown({
                 )}
               </div>
             </div>
-
-            <div className="avatar-roles-list">
-              {roles.length > 0 ? (
-                roles.map((r) => (
-                  <span key={r} className="avatar-role-pill">
-                    {r}
-                  </span>
-                ))
-              ) : (
-                <span className="avatar-role-pill neutral">standard</span>
-              )}
-            </div>
           </div>
 
-          <div className="avatar-dropdown-divider" />
-
-          <div className="avatar-dropdown-links">
-            {isAdmin && !isInAdminPage && (
-              <Link
-                href="/admin"
-                className="avatar-dropdown-link"
-                onClick={() => setOpen(false)}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+          {isAdmin && !isInAdminPage && (
+            <>
+              <div className="avatar-dropdown-divider" />
+              <div className="avatar-dropdown-links">
+                <Link
+                  href="/admin"
+                  className="avatar-dropdown-link"
+                  onClick={() => setOpen(false)}
                 >
-                  <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
-                  <path d="M12 2a10 10 0 0 1 10 10" />
-                </svg>
-                <span>Admin Console</span>
-              </Link>
-            )}
-
-            {isInAdminPage && (
-              <Link
-                href="/"
-                className="avatar-dropdown-link"
-                onClick={() => setOpen(false)}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-                <span>Back to Chat</span>
-              </Link>
-            )}
-          </div>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
+                    <path d="M12 2a10 10 0 0 1 10 10" />
+                  </svg>
+                  <span>Admin Console</span>
+                </Link>
+              </div>
+            </>
+          )}
 
           <div className="avatar-dropdown-divider" />
 

@@ -464,176 +464,68 @@ export function renderDocsHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Starter Backend API Documentation</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Starter Backend API - Swagger UI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.18.2/favicon-32x32.png" sizes="32x32" />
   <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --primary: #38bdf8;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --code-bg: #0b1120;
+    html {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
     body {
+      margin: 0;
+      background: #fafafa;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      padding: 2rem 1rem;
     }
-    .container { max-width: 900px; margin: 0 auto; }
-    header { margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; }
-    h1 { font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem; }
-    p.lead { color: var(--text-muted); font-size: 1.1rem; }
-    .badge {
-      display: inline-block;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      font-weight: bold;
-      text-transform: uppercase;
-      margin-right: 0.5rem;
+    .topbar {
+      display: none !important;
     }
-    .badge-get { background: #0284c7; color: white; }
-    .badge-post { background: #16a34a; color: white; }
-    .spec-link {
-      display: inline-block;
-      margin-top: 1rem;
-      color: var(--primary);
-      text-decoration: none;
-      font-size: 0.9rem;
-      border: 1px solid var(--border);
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
+    .swagger-ui .info {
+      margin: 28px 0;
     }
-    .spec-link:hover { background: var(--card-bg); }
-    .endpoint {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-      overflow: hidden;
-    }
-    .endpoint-header {
-      padding: 1rem 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: rgba(255, 255, 255, 0.02);
-      border-bottom: 1px solid var(--border);
-    }
-    .path { font-family: monospace; font-size: 1.1rem; font-weight: 600; }
-    .desc { color: var(--text-muted); font-size: 0.95rem; }
-    .endpoint-body { padding: 1.25rem; font-size: 0.9rem; }
-    .section-title { font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; margin-bottom: 0.5rem; letter-spacing: 0.05em; }
-    pre {
-      background: var(--code-bg);
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      overflow-x: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.85rem;
-      border: 1px solid var(--border);
-      margin-top: 0.5rem;
-      color: #e2e8f0;
-    }
-    .tag {
-      font-size: 0.75rem;
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-      background: #334155;
-      color: #cbd5e1;
-      margin-left: auto;
+    .swagger-ui .info .title {
+      font-size: 28px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>AI Starter Backend API</h1>
-      <p class="lead">Interactive reference for backend endpoints, authentication, and health probes.</p>
-      <a class="spec-link" href="/openapi.json" target="_blank">View Raw OpenAPI 3.1 Specification JSON &rarr;</a>
-    </header>
-
-    <div class="endpoint">
-      <div class="endpoint-header">
-        <span class="badge badge-get">GET</span>
-        <span class="path">/healthz</span>
-        <span class="tag">Liveness</span>
-      </div>
-      <div class="endpoint-body">
-        <p class="desc">Process liveness check returning uptime, memory, and Node version.</p>
-        <div class="section-title" style="margin-top: 1rem;">Example Response (200 OK)</div>
-        <pre><code>{
-  "status": "healthy",
-  "service": "ai-starter-backend",
-  "uptimeSeconds": 45.2,
-  "timestamp": "2026-10-14T14:30:00.000Z",
-  "node": "v24.20.0",
-  "memory": { "heapUsedMb": 24.5, "rssMb": 51.2 }
-}</code></pre>
-      </div>
+  <noscript>
+    <div style="padding: 24px; font-family: sans-serif;">
+      <h2>AI Starter Backend API</h2>
+      <p>Interactive Swagger UI requires JavaScript. Key endpoints: <code>/healthz</code>, <code>/readyz</code>, <code>/openapi.json</code>, <code>/api/ai/test</code>, <code>/api/conversations</code>.</p>
+      <p>Download the raw specification: <a href="/openapi.json">/openapi.json</a></p>
     </div>
-
-    <div class="endpoint">
-      <div class="endpoint-header">
-        <span class="badge badge-get">GET</span>
-        <span class="path">/readyz</span>
-        <span class="tag">Readiness</span>
-      </div>
-      <div class="endpoint-body">
-        <p class="desc">Dependency readiness check for Keycloak OIDC and Archestra LLM Gateway.</p>
-        <div class="section-title" style="margin-top: 1rem;">Example Response (200 OK)</div>
-        <pre><code>{
-  "status": "ready",
-  "timestamp": "2026-10-14T14:30:00.000Z",
-  "checks": {
-    "keycloak": { "status": "up", "latencyMs": 14 },
-    "archestra": { "status": "up", "latencyMs": 9 }
-  }
-}</code></pre>
-      </div>
-    </div>
-
-    <div class="endpoint">
-      <div class="endpoint-header">
-        <span class="badge badge-get">GET</span>
-        <span class="path">/api/admin/status</span>
-        <span class="tag">Role: admin</span>
-      </div>
-      <div class="endpoint-body">
-        <p class="desc">Verifies administrator capabilities via JWT Bearer token.</p>
-        <div class="section-title" style="margin-top: 1rem;">Required Header</div>
-        <pre><code>Authorization: Bearer &lt;keycloak-access-token&gt;</code></pre>
-      </div>
-    </div>
-
-    <div class="endpoint">
-      <div class="endpoint-header">
-        <span class="badge badge-post">POST</span>
-        <span class="path">/api/ai/test</span>
-        <span class="tag">Role: developer | admin</span>
-      </div>
-      <div class="endpoint-body">
-        <p class="desc">Executes Mastra Agent against Archestra gateway. Rate limited to 20 req/min.</p>
-        <div class="section-title" style="margin-top: 1rem;">Request Body (JSON)</div>
-        <pre><code>{
-  "prompt": "Say hello and confirm AI connectivity"
-}</code></pre>
-        <div class="section-title" style="margin-top: 1rem;">Response (200 OK)</div>
-        <pre><code>{
-  "result": "AI connection confirmed successfully."
-}</code></pre>
-      </div>
-    </div>
-  </div>
+  </noscript>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-standalone-preset.js" crossorigin="anonymous"></script>
+  <script>
+    window.onload = function() {
+      window.ui = SwaggerUIBundle({
+        url: "/openapi.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        filter: true,
+        tryItOutEnabled: true
+      });
+    };
+  </script>
 </body>
 </html>`;
 }

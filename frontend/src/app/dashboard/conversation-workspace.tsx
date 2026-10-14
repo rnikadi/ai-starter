@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
-import Link from "next/link";
 
 interface Conversation {
   id: string;
@@ -45,8 +44,6 @@ const STARTER_PROMPTS = [
 
 export function ConversationWorkspace({
   canTestAI,
-  isAdmin,
-  userRoles = [],
 }: ConversationWorkspaceProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -56,11 +53,22 @@ export function ConversationWorkspace({
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isViewer = !canTestAI;
+
+  async function handleCopy(id: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // clipboard access error fallback
+    }
+  }
 
   // Auto-scroll to bottom whenever messages or loading change
   useEffect(() => {
@@ -173,6 +181,9 @@ export function ConversationWorkspace({
     setLoading(true);
     const userText = textToSend.trim();
     setPrompt("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
 
     let targetConvId = activeConvId;
 
@@ -258,7 +269,7 @@ export function ConversationWorkspace({
 
   return (
     <div className="chatgpt-layout">
-      {/* 1. Left Sidebar (ChatGPT-style dark pane) */}
+      {/* 1. Left Sidebar (Unified theme matching admin console) */}
       <aside className="chatgpt-sidebar">
         <div className="chatgpt-sidebar-top">
           {canTestAI ? (
@@ -355,44 +366,6 @@ export function ConversationWorkspace({
             );
           })}
         </div>
-
-        {/* Sidebar Footer */}
-        <div className="chatgpt-sidebar-footer">
-          <div className="chatgpt-sidebar-role-badge">
-            <span className="chatgpt-sidebar-role-dot" />
-            <span>
-              {isViewer
-                ? "Viewer (Read-Only)"
-                : isAdmin
-                  ? "Administrator"
-                  : "Developer Access"}
-            </span>
-            {userRoles.length > 0 && (
-              <span className="chatgpt-sidebar-role-sub">
-                ({userRoles.join(", ")})
-              </span>
-            )}
-          </div>
-
-          {isAdmin && (
-            <Link href="/admin" className="chatgpt-sidebar-admin-link">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
-                <path d="M12 2a10 10 0 0 1 10 10" />
-              </svg>
-              <span>Admin Console</span>
-            </Link>
-          )}
-        </div>
       </aside>
 
       {/* 2. Main Chat Area */}
@@ -459,6 +432,32 @@ export function ConversationWorkspace({
 
                   <div className="chatgpt-message-content">
                     <div className="chatgpt-message-text">{msg.content}</div>
+                    {!isUser && (
+                      <button
+                        type="button"
+                        className="chatgpt-copy-btn"
+                        onClick={() => void handleCopy(msg.id, msg.content)}
+                        title="Copy to clipboard"
+                        aria-label="Copy message"
+                      >
+                        {copiedId === msg.id ? (
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -498,7 +497,11 @@ export function ConversationWorkspace({
                     : "Message AI Starter..."
                 }
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                }}
                 onKeyDown={handleKeyDown}
                 disabled={isViewer || loading}
               />

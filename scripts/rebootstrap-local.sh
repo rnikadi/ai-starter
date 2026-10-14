@@ -2,15 +2,16 @@
 
 set -Eeuo pipefail
 
-PROJECT_NAME="ai-starter"
+PACKAGE_NAME="$(node -p 'require("./package.json").name' 2>/dev/null || echo "ai-starter")"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$PACKAGE_NAME}"
 REALM="ai-starter"
 KEYCLOAK_URL="http://localhost:8080"
 ARCHestra_URL="http://localhost:3000"
 
 VOLUMES=(
-  "ai-starter-keycloak-data"
-  "ai-starter-postgres-data"
-  "ai-starter-app-data"
+  "${PROJECT_NAME}-keycloak-data"
+  "${PROJECT_NAME}-postgres-data"
+  "${PROJECT_NAME}-app-data"
 )
 
 printf '\n========== Local Environment Rebootstrap ==========\n'
@@ -71,9 +72,9 @@ for volume in "${VOLUMES[@]}"; do
   )"
 
   case "$volume" in
-    ai-starter-keycloak-data) expected_label="keycloak-data" ;;
-    ai-starter-postgres-data) expected_label="postgres-data" ;;
-    ai-starter-app-data) expected_label="app-data" ;;
+    "${PROJECT_NAME}-keycloak-data") expected_label="keycloak-data" ;;
+    "${PROJECT_NAME}-postgres-data") expected_label="postgres-data" ;;
+    "${PROJECT_NAME}-app-data") expected_label="app-data" ;;
     *)
       printf 'ERROR: Unrecognized volume: %s\n' "$volume" >&2
       exit 1

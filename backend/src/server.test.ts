@@ -117,6 +117,10 @@ function executeRequest(
         resHeaders[name.toLowerCase()] = value;
         return res;
       },
+      removeHeader(name: string) {
+        delete resHeaders[name.toLowerCase()];
+        return res;
+      },
       getHeader(name: string) {
         return resHeaders[name.toLowerCase()];
       },
@@ -398,6 +402,65 @@ describe("Backend Server Endpoints", () => {
     const json = JSON.parse(res.body) as Record<string, unknown>;
     expect(json.result).toContain("Connection test successful for: Save my chat");
     expect(json.conversationId).toBe("conv-mock-123");
+  });
+
+  it("serves Prometheus metrics on GET /metrics", async () => {
+    const res = await executeRequest(server, { url: "/metrics" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/plain");
+    expect(res.body).toContain("http_requests_total");
+    expect(res.body).toContain("nodejs_");
+  });
+
+  it("rejects request bodies exceeding 1MB with 413", async () => {
+    // 1 MB + 10 bytes
+    const hugeBody = "x".repeat(1024 * 1024 + 10);
+    const res = await executeRequest(server, {
+      method: "POST",
+      url: "/api/conversations",
+      headers: {
+        "content-type": "application/json",
+        "x-user-roles": JSON.stringify(["developer"]),
+      },
+      body: hugeBody,
+    });
+    expect(res.statusCode).toBe(413);
+  });
+
+  it("rejects empty conversation title on POST /api/conversations with 400", async () => {
+    const res = await executeRequest(server, {
+      method: "POST",
+      url: "/api/conversations",
+      headers: {
+        "content-type": "application/json",
+        "x-user-roles": JSON.stringify(["developer"]),
+      },
+      body: { title: "   " },
+    });
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body) as Record<string, unknown>;
+    expect(json.error).toBe("Title must not be empty.");
+  });
+
+  it("propagates incoming W3C traceparent and returns x-trace-id header", async () => {
+    const incomingTraceparent =
+      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const res = await executeRequest(server, {
+      url: "/healthz",
+      headers: {
+        traceparent: incomingTraceparent,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["x-trace-id"]).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+    expect(res.headers["traceparent"]).toContain("4bf92f3577b34da6a3ce929d0e0e4736");
+  });
+
+  it("generates a new traceId when no traceparent is provided", async () => {
+    const res = await executeRequest(server, { url: "/healthz" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["x-trace-id"]).toMatch(/^[0-9a-f]{32}$/);
+    expect(res.headers["traceparent"]).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
   });
 
   it("returns 404 for unknown routes", async () => {

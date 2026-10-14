@@ -23,6 +23,10 @@ if [[ -z "$ADMIN_PASSWORD" ]]; then
   exit 1
 fi
 
+kc_exec() {
+  docker compose exec -T keycloak "$@"
+}
+
 echo "Waiting for Keycloak..."
 ready=false
 
@@ -41,7 +45,7 @@ if [[ "$ready" != "true" ]]; then
   exit 1
 fi
 
-docker exec keycloak "$KCADM" config credentials \
+kc_exec "$KCADM" config credentials \
   --server http://localhost:8080 \
   --realm master \
   --user "$ADMIN_USER" \
@@ -50,7 +54,7 @@ docker exec keycloak "$KCADM" config credentials \
 echo "Looking up OIDC client..."
 
 CLIENT_JSON="$(
-  docker exec keycloak "$KCADM" get clients \
+  kc_exec "$KCADM" get clients \
     -r "$REALM" -q "clientId=${CLIENT_ID}"
 )"
 
@@ -73,7 +77,7 @@ CLIENT_UUID="$(
 
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:3001}"
 
-docker exec keycloak "$KCADM" update "clients/${CLIENT_UUID}" \
+kc_exec "$KCADM" update "clients/${CLIENT_UUID}" \
   -r "$REALM" \
   -s "redirectUris=[\"${FRONTEND_URL}/*\",\"http://localhost:3001/*\",\"http://127.0.0.1:3001/*\"]" \
   -s "webOrigins=[\"${FRONTEND_URL}\",\"http://localhost:3001\",\"http://127.0.0.1:3001\",\"+\"]" \
@@ -81,7 +85,7 @@ docker exec keycloak "$KCADM" update "clients/${CLIENT_UUID}" \
   >/dev/null
 
 CLIENT_JSON="$(
-  docker exec keycloak "$KCADM" get "clients/${CLIENT_UUID}" -r "$REALM"
+  kc_exec "$KCADM" get "clients/${CLIENT_UUID}" -r "$REALM"
 )"
 
 printf '%s' "$CLIENT_JSON" |
@@ -113,7 +117,7 @@ ensure_user() {
   local user_id
 
   user_json="$(
-    docker exec keycloak "$KCADM" get users \
+    kc_exec "$KCADM" get users \
       -r "$REALM" -q "username=${username}"
   )"
 
@@ -133,7 +137,7 @@ ensure_user() {
   if [[ -z "$user_id" ]]; then
     echo "Creating demo user: ${username}"
 
-    docker exec keycloak "$KCADM" create users \
+    kc_exec "$KCADM" create users \
       -r "$REALM" \
       -s "username=${username}" \
       -s enabled=true \
@@ -143,7 +147,7 @@ ensure_user() {
   fi
 
   user_json="$(
-    docker exec keycloak "$KCADM" get users \
+    kc_exec "$KCADM" get users \
       -r "$REALM" -q "username=${username}"
   )"
 
@@ -165,19 +169,19 @@ ensure_user() {
     exit 1
   fi
 
-  docker exec keycloak "$KCADM" set-password \
+  kc_exec "$KCADM" set-password \
     -r "$REALM" \
     --username "$username" \
     --new-password "$password" \
     >/dev/null
 
-  docker exec keycloak "$KCADM" update "users/${user_id}" \
+  kc_exec "$KCADM" update "users/${user_id}" \
     -r "$REALM" \
     -s enabled=true \
     >/dev/null
 
   user_json="$(
-    docker exec keycloak "$KCADM" get users \
+    kc_exec "$KCADM" get users \
       -r "$REALM" -q "username=${username}"
   )"
 
@@ -204,10 +208,10 @@ ensure_user() {
       });
     '
 
-  if ! docker exec keycloak "$KCADM" get-roles \
+  if ! kc_exec "$KCADM" get-roles \
     -r "$REALM" --uusername "$username" 2>/dev/null |
     grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${role}\""; then
-    docker exec keycloak "$KCADM" add-roles \
+    kc_exec "$KCADM" add-roles \
       -r "$REALM" \
       --uusername "$username" \
       --rolename "$role" \

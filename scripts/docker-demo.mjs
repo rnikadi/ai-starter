@@ -11,6 +11,12 @@ const RED = "\x1b[31m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
+const pkg = JSON.parse(
+  fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
+process.env.COMPOSE_PROJECT_NAME =
+  process.env.COMPOSE_PROJECT_NAME || pkg.name || "ai-starter";
+
 function log(msg) {
   console.log(`${CYAN}[docker-demo]${RESET} ${msg}`);
 }

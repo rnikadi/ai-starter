@@ -254,14 +254,14 @@ export function AdminConsole({ user, roles = [] }: AdminConsoleProps) {
                 </a>
 
                 <a
-                  href="http://localhost:3001"
+                  href="http://localhost:3002"
                   target="_blank"
                   rel="noreferrer"
                   className="admin-link-card"
                 >
                   <span className="admin-link-title">Grafana Observability</span>
                   <span className="admin-link-desc">View platform metrics, Prometheus graphs, and Loki logs.</span>
-                  <span className="admin-link-url">localhost:3001 ↗</span>
+                  <span className="admin-link-url">localhost:3002 ↗</span>
                 </a>
 
                 <a
@@ -273,6 +273,17 @@ export function AdminConsole({ user, roles = [] }: AdminConsoleProps) {
                   <span className="admin-link-title">Prometheus Metrics</span>
                   <span className="admin-link-desc">Direct query interface for metrics and container scrapes.</span>
                   <span className="admin-link-url">localhost:9090 ↗</span>
+                </a>
+
+                <a
+                  href="http://localhost:3002/explore?schemaVersion=1&panes=%7B%22tempo%22:%7B%22datasource%22:%22tempo%22%7D%7D"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="admin-link-card"
+                >
+                  <span className="admin-link-title">Tempo Distributed Traces</span>
+                  <span className="admin-link-desc">Trace waterfalls, span latencies, and OpenTelemetry query in Grafana.</span>
+                  <span className="admin-link-url">localhost:3002 (Tempo) ↗</span>
                 </a>
 
                 <a

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const MAX_PROMPT_LENGTH = 10_000;
 
 export type AiTestRequestValidation =
@@ -12,6 +14,38 @@ export type AiTestRequestValidation =
       error: string;
     };
 
+export const aiTestRequestSchema = z.object({
+  prompt: z
+    .string()
+    .transform((val) => val.replace(/\0/g, "").trim())
+    .refine((val) => val.length > 0, {
+      message: 'The "prompt" field must not be empty.',
+    })
+    .refine((val) => val.length <= MAX_PROMPT_LENGTH, {
+      message: `The prompt must not exceed ${MAX_PROMPT_LENGTH} characters.`,
+    }),
+  conversationId: z
+    .string()
+    .transform((val) => val.replace(/\0/g, "").trim())
+    .refine((val) => val.length > 0, {
+      message:
+        'The "conversationId" field must be a non-empty string when provided.',
+    })
+    .optional(),
+});
+
+export const createConversationSchema = z.object({
+  title: z
+    .string()
+    .transform((val) => val.replace(/[<>\0]/g, "").trim())
+    .refine((val) => val.length > 0, {
+      message: "Title must not be empty.",
+    })
+    .refine((val) => val.length <= 100, {
+      message: "Title must not exceed 100 characters.",
+    }),
+});
+
 export function validateAiTestRequest(
   body: unknown,
 ): AiTestRequestValidation {
@@ -19,7 +53,7 @@ export function validateAiTestRequest(
     typeof body !== "object" ||
     body === null ||
     !("prompt" in body) ||
-    typeof body.prompt !== "string"
+    typeof (body as { prompt?: unknown }).prompt !== "string"
   ) {
     return {
       success: false,
@@ -28,21 +62,8 @@ export function validateAiTestRequest(
     };
   }
 
-  let conversationId: string | undefined;
-  if ("conversationId" in body && body.conversationId !== undefined && body.conversationId !== null) {
-    if (typeof body.conversationId !== "string" || !body.conversationId.trim()) {
-      return {
-        success: false,
-        status: 400,
-        error: 'The "conversationId" field must be a non-empty string when provided.',
-      };
-    }
-    conversationId = body.conversationId.trim();
-  }
-
-  const prompt = body.prompt.trim();
-
-  if (!prompt) {
+  const rawPrompt = (body as { prompt: string }).prompt.replace(/\0/g, "").trim();
+  if (rawPrompt.length === 0) {
     return {
       success: false,
       status: 400,
@@ -50,7 +71,7 @@ export function validateAiTestRequest(
     };
   }
 
-  if (prompt.length > MAX_PROMPT_LENGTH) {
+  if (rawPrompt.length > MAX_PROMPT_LENGTH) {
     return {
       success: false,
       status: 413,
@@ -58,9 +79,34 @@ export function validateAiTestRequest(
     };
   }
 
+  if (
+    "conversationId" in body &&
+    body.conversationId !== undefined &&
+    (typeof body.conversationId !== "string" ||
+      body.conversationId.replace(/\0/g, "").trim().length === 0)
+  ) {
+    return {
+      success: false,
+      status: 400,
+      error: 'The "conversationId" field must be a non-empty string when provided.',
+    };
+  }
+
+  const result = aiTestRequestSchema.safeParse(body);
+  if (!result.success) {
+    const firstIssue = result.error.issues[0];
+    return {
+      success: false,
+      status: 400,
+      error: firstIssue?.message ?? "Invalid request body.",
+    };
+  }
+
   return {
     success: true,
-    prompt,
-    ...(conversationId ? { conversationId } : {}),
+    prompt: result.data.prompt,
+    ...(result.data.conversationId
+      ? { conversationId: result.data.conversationId }
+      : {}),
   };
 }
