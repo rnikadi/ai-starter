@@ -19,7 +19,8 @@ SEARCH_DIRS = [
     ROOT / "scripts",
     ROOT / "docs",
     ROOT / "keycloak",
-    ROOT / "src",
+    ROOT / "frontend",
+    ROOT / "backend",
 ]
 
 ROOT_FILES = [

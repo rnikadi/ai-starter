@@ -1,0 +1,15 @@
+{
+  "name": "ai-starter-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node --import tsx src/index.ts",
+    "test": "vitest run",
+    "test:archestra": "node --env-file=../.env.local --experimental-strip-types scripts/test-archestra.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}
+

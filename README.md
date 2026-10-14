@@ -35,12 +35,13 @@ AI Starter provides a small web application, an AI integration path through an L
 Browser
   |
   v
-Next.js application (host) :3001
-  |  Auth.js / Keycloak OIDC
-  |  Application API
+Frontend (Next.js) :3001
+  |  Auth.js / Keycloak OIDC (:8080)
+  |  HTTP requests with Bearer token
   v
-Mastra agent (in-process)
-  |
+Backend (Node.js API) :4000
+  |  JWT Bearer token verification & RBAC
+  |  Mastra agent
   v
 Archestra LLM proxy :9000
   |
@@ -56,23 +57,30 @@ Local infrastructure:
 
 | Component | Responsibility | Local address |
 |---|---|---|
-| Next.js | UI, Auth.js integration, application API | http://localhost:3001 |
-| Mastra | Agent execution and model invocation | In-process |
-| Archestra | LLM gateway and model routing | http://localhost:9000 |
-| Archestra UI | Gateway administration | http://localhost:3000 |
-| Keycloak | OIDC identity provider and realm roles | http://localhost:8080 |
-| OpenRouter or another configured provider | Model inference behind Archestra | Configured in Archestra |
+| **Frontend** (Next.js) | UI, Auth.js integration, client dashboard, role views | http://localhost:3001 |
+| **Backend** (Node.js API) | Standalone API server, Mastra agent, JWT auth & RBAC | http://localhost:4000 |
+| **Grafana Observability** | Unified visual log dashboard (Keycloak, Archestra, Backend, Frontend) | http://localhost:3002 |
+| **Loki** | High-performance log aggregation engine | http://localhost:3100 |
+| **API Docs & Swagger** | Interactive API documentation (self-contained, offline) | http://localhost:4000/docs |
+| **OpenAPI 3.1 Spec** | Machine-readable API schema definition | http://localhost:4000/openapi.json |
+| **Health Probes** | Process liveness (`/healthz`) & dependency readiness (`/readyz`) | http://localhost:4000/healthz |
+| **Mastra** | Autonomous agent execution & prompt routing | Inside Backend (:4000) |
+| **Archestra** | LLM gateway and model routing | http://localhost:9000 |
+| **Archestra UI** | Gateway administration | http://localhost:3000 |
+| **Keycloak** | OIDC identity provider and realm roles | http://localhost:8080 |
+| **OpenRouter / Provider** | Model inference behind Archestra | Configured in Archestra |
 
-The Next.js application runs on the host with pnpm; it is not a service in the current `docker-compose.yaml`. Infrastructure ports are bound to loopback for local development.
+The frontend and backend run as distinct services on the host machine. Infrastructure ports are bound to loopback for local development.
 
 ### Request flow
 
-1. A browser opens the Next.js application.
-2. Sign-in is delegated to Keycloak through Auth.js.
-3. The application uses the session and realm roles to render role-aware UI.
-4. An authorized AI test request invokes the Mastra agent.
-5. Mastra routes the model request through Archestra to the configured provider.
-6. The response returns through Mastra to the API/UI.
+1. A browser opens the frontend application at http://localhost:3001.
+2. Sign-in is delegated to Keycloak (:8080) through Auth.js.
+3. The frontend captures the user's session and Access Token.
+4. An authorized request (such as AI testing) calls the backend at http://localhost:4000 with the Bearer token.
+5. The backend validates the token and realm roles (`developer` / `admin`).
+6. The backend executes the Mastra agent, routing through Archestra (:9000) to the model provider.
+7. The response returns from the backend to the frontend and browser.
 
 Authentication and authorization behavior must be verified with real browser sessions and HTTP status checks.
 
@@ -311,29 +319,50 @@ Expected issuer:
 http://localhost:8080/realms/ai-starter
 ```
 
+### Local test accounts and credentials
+
+The repository provides automated bootstrap scripts to provision local development accounts in the `ai-starter` realm:
+
+| Account | Username | Default Password | Realm Role | Bootstrap Script |
+|---|---|---|---|---|
+| **Administrator** | `Admin` | `password` | `admin` | `./scripts/bootstrap-keycloak-admin.sh` |
+| **Developer** | `developer` | `password` | `developer` | `./scripts/bootstrap-keycloak-users.sh` |
+| **Viewer** | `viewer` | `password` | `viewer` | `./scripts/bootstrap-keycloak-users.sh` |
+
+> [!WARNING]
+> These credentials are intended exclusively for local development and demonstration. Never use them in staging or production environments.
+
 ### Provision local test users
 
-The repository includes `scripts/bootstrap-keycloak-users.sh` to provision local developer and viewer test users. Review the script before running it, and only use it against a local development Keycloak instance. Its configured test credentials are for local development only.
+1. **Bootstrap developer and viewer accounts**:
+   ```bash
+   ./scripts/bootstrap-keycloak-users.sh
+   ```
 
-```bash
-bash -n scripts/bootstrap-keycloak-users.sh
-bash scripts/bootstrap-keycloak-users.sh
-```
+2. **Bootstrap administrator account**:
+   ```bash
+   ./scripts/bootstrap-keycloak-admin.sh
+   ```
+   If the `Admin` account already exists, the script preserves its existing password. To explicitly reset the `Admin` password:
+   ```bash
+   STARTER_ADMIN_RESET_PASSWORD=true ./scripts/bootstrap-keycloak-admin.sh
+   # Or with a custom local password:
+   STARTER_ADMIN_RESET_PASSWORD=true \
+   STARTER_ADMIN_PASSWORD='Replace-With-Your-Own-Local-Password' \
+   ./scripts/bootstrap-keycloak-admin.sh
+   ```
 
-The script uses Keycloak's `kcadm.sh` inside the `keycloak` container and expects the administrator credentials to match the initialized Keycloak database. If it fails at administrator authentication, do not repeatedly reset volumes; first verify which administrator was initialized and which database the container is using.
+Both scripts use Keycloak's `kcadm.sh` inside the `keycloak` container and expect administrator credentials matching the initialized Keycloak database. If authentication fails, do not reset volumes; verify which administrator was initialized in `.env.keycloak`.
 
 For browser verification:
 
 1. Open http://localhost:3001.
 2. Select **Sign in with Keycloak**.
-3. Sign in as the developer test user.
-4. Confirm the application returns to the local workspace and displays roles.
-5. Test the AI connectivity panel.
-6. Sign out and repeat with the viewer user.
-7. Confirm viewer access is restricted where required.
-8. Verify anonymous and viewer API requests return the status codes enforced by the current API route.
-
-Do not mark login/RBAC as verified until these browser and HTTP checks have actually passed.
+3. Sign in as the `developer` user.
+4. Confirm the application returns to the local workspace, displays the `developer` role, and allows AI connectivity testing.
+5. Sign out and repeat with the `viewer` user; confirm AI testing is restricted.
+6. Sign out and repeat with `Admin`; confirm the **Admin console** link is visible, and verify access to http://localhost:3001/admin and http://localhost:3001/api/admin/status.
+7. Verify anonymous and viewer API requests return the status codes enforced by the current API routes (401 / 403).
 
 ## Run the application
 
@@ -343,15 +372,62 @@ Install dependencies:
 pnpm install
 ```
 
-Start the development server on port 3001 (required by the Keycloak redirect URI):
+### Development Modes
+
+AI Starter supports two distinct development modes:
+
+#### Mode 1: Host Development (Fastest, hot-reloading)
+
+Recommended for active day-to-day code editing:
 
 ```bash
-pnpm dev --port 3001
+# Starts Keycloak (:8080) & Archestra (:9000/:3000) in Docker,
+# and runs Backend (:4000) + Frontend (:3001) concurrently on the host with hot-reloading:
+pnpm dev
+
+# Stop Docker infrastructure when done
+pnpm dev:down
+
+# Other options:
+pnpm dev:app       # Starts backend and frontend only (skips Docker check/startup)
+pnpm dev:backend   # Starts the backend API server alone on http://localhost:4000
+pnpm dev:frontend  # Starts the Next.js frontend alone on http://localhost:3001
 ```
 
-Keep the server running in its terminal. Open a second terminal for validation commands.
+> **How `pnpm dev` works:**
+> 1. Verifies Docker Desktop is running and automatically executes `docker compose up -d` to ensure Keycloak (:8080) and Archestra (:9000/:3000) are running.
+> 2. Displays the service dashboard with ports and URLs.
+> 3. Spawns the Backend (:4000) and Frontend (:3001) concurrently in the foreground.
+> 4. Pressing `Ctrl+C` cleanly terminates the host development servers while keeping Docker containers running. When you want to stop the Docker containers, run `pnpm dev:down`.
 
-The Next.js server runs on the host; restarting Docker Compose does not restart the host process.
+#### Mode 2: Full Containerized Demo & Observability (Grafana + Loki)
+
+Recommended for stakeholder demos, presentations, or testing production Docker images:
+
+```bash
+# Builds and starts all 7 containers:
+# Frontend (:3001), Backend (:4000), Keycloak (:8080), Archestra (:9000/:3000),
+# Grafana (:3002), Loki (:3100), and Promtail
+pnpm docker:demo
+
+# Open Grafana to inspect live visual logs across all 4 services
+open http://localhost:3002  # Default login: admin / admin
+
+# Check container status
+pnpm docker:status
+
+# Stop all demo containers when done
+pnpm docker:down
+```
+
+#### Optional: Standalone Observability with Host Dev
+
+If you are developing locally with `pnpm dev` and want to spin up Grafana & Loki to visualize logs from Keycloak and Archestra:
+
+```bash
+pnpm monitoring:up     # Starts Loki (:3100), Promtail, and Grafana (:3002)
+pnpm monitoring:down   # Stops monitoring containers
+```
 
 ## Test the AI integration
 
@@ -388,6 +464,49 @@ curl --fail-with-body --silent --show-error --max-time 120 \
 ```
 
 The API may require a valid session and an authorized role. If an anonymous call is rejected, sign in through the browser and use an authenticated browser session for authorized testing. Check the route's current behavior rather than assuming a specific HTTP status.
+
+## Platform features and architecture
+
+AI Starter provides production-grade backend plumbing designed to remain generic and unopinionated so developers can build their own custom business logic and UI without clean-up overhead:
+
+### 1. Structured logging and correlation IDs
+- All requests are tagged with a unique `x-request-id` (UUID).
+- Incoming `x-request-id` headers from browsers or reverse proxies are preserved and propagated from the Next.js frontend proxy to the backend API.
+- Configurable output format (`LOG_FORMAT=pretty` for colored human-readable development output; `LOG_FORMAT=json` for JSON production output).
+- Configurable log levels (`LOG_LEVEL=debug|info|warn|error`).
+
+### 2. Standardized health and readiness probes
+- **`GET /healthz`** (Liveness probe): Returns process status, uptime, Node version, and memory usage statistics.
+- **`GET /readyz`** (Readiness probe): Verifies downstream dependencies (Keycloak OIDC discovery and Archestra LLM gateway). Returns `200 OK` when ready or `503 Service Unavailable` with details if a dependency fails.
+- Frontend exposes `/api/healthz` and `/api/readyz` checking backend availability.
+
+### 3. Fail-fast environment validation (Zod)
+- Environment variables are validated on server startup using strict Zod schemas (`backend/src/config/env.ts` and `frontend/src/lib/env.ts`).
+- Missing or malformed configurations trigger clear, descriptive error messages on boot rather than failing unexpectedly during runtime.
+
+### 4. Pluggable RBAC route guards
+- Reusable, declarative middleware functions in `backend/src/middleware/rbac.ts`:
+  - `guardAuth(req, res)`: Enforces JWT Bearer or forwarded session authentication.
+  - `guardRoles(res, user, allowedRoles)`: Enforces realm roles (`viewer`, `developer`, `admin`).
+  - Helper predicates: `hasRole()`, `hasAnyRole()`, `hasAllRoles()`.
+
+### 5. API rate limiting and protection
+- In-memory sliding window rate limiter in `backend/src/middleware/rate-limit.ts`.
+- Preconfigured rate limiters:
+  - `apiRateLimiter`: 120 req/min for general API routes.
+  - `aiRateLimiter`: 20 req/min for LLM generation routes to prevent quota exhaustion.
+- Enforces standard headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`.
+
+### 6. OpenAPI 3.1 specification and offline documentation
+- **`GET /openapi.json`**: Complete, machine-readable OpenAPI 3.1 specification.
+- **`GET /docs`**: Interactive, dark-mode API documentation viewer. Self-contained with zero external CDN dependencies—works 100% offline.
+
+### 7. Offline mock AI mode (`MOCK_AI=true`)
+- Set `MOCK_AI=true` in `.env.local` to develop and test without running Archestra or requiring external OpenRouter API keys.
+- Returns instant simulated agent responses marked with `[MOCK AI MODE]`.
+
+### 8. Automated CI workflow
+- `.github/workflows/ci.yml` runs automated tests, typechecks, linting, and production builds on push and pull requests.
 
 ## Validation commands
 
@@ -561,21 +680,21 @@ Run Compose commands from the repository root.
 
 ### Start, stop, and restart
 
+You can use the convenient `pnpm` lifecycle scripts or direct `docker compose` commands:
+
 ```bash
-# Start services in the current Compose project.
-docker compose up -d
+# Start services (Keycloak & Archestra)
+pnpm infra:up     # or: docker compose up -d
 
-# Show service state.
-docker compose ps
+# Show service state
+pnpm infra:status # or: pnpm dev:status / docker compose ps
 
-# Stop/remove current-project containers and network; preserve named volumes.
-docker compose down
+# Stop containers and network; preserve named volumes
+pnpm infra:down   # or: pnpm dev:down / docker compose down
 
-# Start again later.
-docker compose up -d
-
-# Restart all services in the current project.
+# Restart all services in the current project
 docker compose restart
+```
 
 # Restart one service.
 docker compose restart keycloak
@@ -956,4 +1075,4 @@ Do not stage environment files or secrets. This repository is currently private;
 
 ## Local development
 
-See [local development setup and demo credentials](docs/LOCAL-DEVELOPMENT.md).
+See [Keycloak and local test users](#keycloak-and-local-test-users) for provisioning demo accounts and local verification commands.

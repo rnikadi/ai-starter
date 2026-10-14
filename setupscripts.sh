@@ -80,6 +80,17 @@ else
   echo "Preserving existing .env.local."
 fi
 
+if ! grep -q "^AUTH_SECRET=" .env.local 2>/dev/null; then
+  printf '\nAUTH_SECRET=%s\n' "$(openssl rand -base64 32)" >> .env.local
+  echo "Added generated AUTH_SECRET to .env.local."
+fi
+
+# Ensure environment symlinks exist for frontend and backend
+mkdir -p frontend backend
+ln -sf ../.env.local frontend/.env.local 2>/dev/null || true
+ln -sf ../.env frontend/.env 2>/dev/null || true
+ln -sf ../.env.local backend/.env.local 2>/dev/null || true
+ln -sf ../.env backend/.env 2>/dev/null || true
 
 echo
 echo "Setup preparation complete."

@@ -166,5 +166,5 @@ printf '\nKeycloak admin bootstrap completed.\n'
 printf 'Username: %s\n' "$USERNAME"
 printf 'Realm: %s\n' "$REALM"
 printf 'Role: admin\n'
-printf 'See docs/LOCAL-DEVELOPMENT.md for local-development credentials.\n'
+printf 'See README.md for local-development credentials.\n'
 printf 'Existing developer/viewer accounts were not modified.\n'

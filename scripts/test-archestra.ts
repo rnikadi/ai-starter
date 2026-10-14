@@ -15,7 +15,7 @@ if (!process.env.ARCHESTRA_VIRTUAL_KEY) {
 }
 
 const { connectionTestAgent } = await import(
-  '../src/mastra/agents/connection-test-agent.ts'
+  '../backend/src/mastra/agents/connection-test-agent.js'
 );
 
 async function main(): Promise<void> {

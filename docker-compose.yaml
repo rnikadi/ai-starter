@@ -31,6 +31,99 @@ services:
       - keycloak-data:/opt/keycloak/data
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-realm.json:ro
 
+  # Full containerized application services (activated with profile: full)
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ai-starter-backend
+    restart: unless-stopped
+    profiles: ["full"]
+    ports:
+      - "127.0.0.1:4000:4000"
+    environment:
+      BACKEND_PORT: "4000"
+      HOST: "0.0.0.0"
+      AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
+      ARCHESTRA_BASE_URL: "http://archestra:9000/v1"
+      ARCHESTRA_VIRTUAL_KEY: "${ARCHESTRA_VIRTUAL_KEY:-}"
+      ARCHESTRA_MODEL: "${ARCHESTRA_MODEL:-}"
+      MOCK_AI: "${MOCK_AI:-false}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      LOG_FORMAT: "json"
+    depends_on:
+      - keycloak
+      - archestra
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: ai-starter-frontend
+    restart: unless-stopped
+    profiles: ["full"]
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      PORT: "3001"
+      HOSTNAME: "0.0.0.0"
+      BACKEND_URL: "http://backend:4000"
+      NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
+      AUTH_URL: "http://localhost:3001"
+      AUTH_SECRET: "${AUTH_SECRET:-local-development-secret-key-32chars}"
+      AUTH_KEYCLOAK_ID: "${AUTH_KEYCLOAK_ID:-ai-starter-web}"
+      AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
+      AUTH_KEYCLOAK_SECRET: "${AUTH_KEYCLOAK_SECRET:-ai-starter-kit-local-client-secret}"
+      LOG_FORMAT: "json"
+    depends_on:
+      - backend
+      - keycloak
+
+  # Observability Stack (activated with profile: monitoring or full)
+  loki:
+    image: grafana/loki:3.3.0
+    container_name: ai-starter-loki
+    restart: unless-stopped
+    profiles: ["full", "monitoring"]
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:3.3.0
+    container_name: ai-starter-promtail
+    restart: unless-stopped
+    profiles: ["full", "monitoring"]
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: ai-starter-grafana
+    restart: unless-stopped
+    profiles: ["full", "monitoring"]
+    ports:
+      - "127.0.0.1:3002:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:3002"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/ai-starter:ro
+    depends_on:
+      - loki
+
 volumes:
   postgres-data:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-postgres-data
@@ -38,3 +131,7 @@ volumes:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-data
   keycloak-data:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-keycloak-data
+  loki-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-loki-data
+  grafana-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-grafana-data

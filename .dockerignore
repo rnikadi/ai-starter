@@ -1,0 +1,13 @@
+node_modules
+.next
+dist
+.git
+.gitignore
+*.log
+.DS_Store
+.env.local
+.env.keycloak
+.env
+commands
+coverage
+
