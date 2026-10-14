@@ -69,6 +69,9 @@ async function HomeContent() {
     AI_ACCESS_ROLES.has(role),
   );
 
+  const isAdmin = roles.includes("admin");
+
+
   return (
     <main className="workspace">
       <header className="topbar">
@@ -90,6 +93,18 @@ async function HomeContent() {
                 : "No realm roles detected"}
             </span>
           </div>
+
+          {isAdmin && (
+            <Link className="access-pill allowed" href="/admin">
+              Admin console
+            </Link>
+          )}
+
+          {isAdmin && (
+            <Link className="access-pill allowed" href="/admin">
+              Admin console
+            </Link>
+          )}
 
           <KeycloakSignOutButton />
         </div>

@@ -427,8 +427,8 @@ This starter kit uses separate credentials for infrastructure administration, AI
 |---|---|---|
 | Keycloak bootstrap administrator | `KC_BOOTSTRAP_ADMIN_USERNAME` (the setup script initially uses `admin`) | `KC_BOOTSTRAP_ADMIN_PASSWORD` in local `.env.keycloak` |
 | Application OIDC client | `ai-starter-web` | Client secret in `keycloak/realm-export.json`, matched by `AUTH_KEYCLOAK_SECRET` in `.env.local` |
-| Application developer test user | `starter-developer` | Current bootstrap script sets `StarterDev123!` |
-| Application viewer test user | `starter-viewer` | Current bootstrap script sets `StarterView123!` |
+| Application developer test user | `Developer` | Current bootstrap script sets `password` |
+| Application viewer test user | `Viewer` | Current bootstrap script sets `password` |
 | Application admin role | No built-in admin user is provisioned by the demo bootstrap script | Create a dedicated user, assign the `admin` realm role, and set a unique password |
 | Archestra administration | No universal default is defined by this repository | Use the administrator account configured for the running Archestra instance |
 | Archestra model gateway | Virtual key configured in Archestra | `ARCHESTRA_VIRTUAL_KEY` in `.env.local` |
@@ -442,8 +442,8 @@ The current `scripts/bootstrap-keycloak-users.sh` script contains these local-on
 
 | Application user | Realm | Role | Current script password |
 |---|---|---|---|
-| `starter-developer` | `ai-starter` | `developer` | `StarterDev123!` |
-| `starter-viewer` | `ai-starter` | `viewer` | `StarterView123!` |
+| `Developer` | `ai-starter` | `developer` | `password` |
+| `Viewer` | `ai-starter` | `viewer` | `password` |
 
 These are generic local demo credentials, not secure defaults. Change them before sharing the repository or using it in any shared environment. The bootstrap script does not currently provision an application user with the `admin` realm role.
 
@@ -480,7 +480,7 @@ If you change a password in the Keycloak UI but leave the old password in `scrip
 
 ### Create a dedicated application administrator
 
-The realm defines an `admin` role, but the current local bootstrap script provisions only `starter-developer` and `starter-viewer`.
+The realm defines an `admin` role, but the current local bootstrap script provisions only `Developer` and `Viewer`.
 
 To create a local administrator:
 
@@ -953,3 +953,7 @@ git push -u origin main
 ```
 
 Do not stage environment files or secrets. This repository is currently private; review the repository contents, commit history, license, and all tracked configuration before changing its visibility to public.
+
+## Local development
+
+See [local development setup and demo credentials](docs/LOCAL-DEVELOPMENT.md).

@@ -710,9 +710,9 @@ login has not yet been confirmed in the conversation.
 -   [x] The `ai-starter-web` OIDC client redirect configuration passes
     the bootstrap script's verification.
 -   [x] `scripts/bootstrap-keycloak-users.sh` completes successfully.
--   [x] `starter-developer` exists in the `ai-starter` realm and is
+-   [x] `Developer` exists in the `ai-starter` realm and is
     enabled.
--   [x] `starter-viewer` exists in the `ai-starter` realm and is
+-   [x] `Viewer` exists in the `ai-starter` realm and is
     enabled.
 -   [x] Both demo users have `requiredActions: []` in the live Keycloak
     response.
@@ -738,9 +738,9 @@ login has not yet been confirmed in the conversation.
     have been added or modified during the current work.
 -   \[\~\] Role extraction from Keycloak claims is present in the auth
     configuration.
--   [ ] Confirm successful browser login for `starter-viewer` without a
+-   [ ] Confirm successful browser login for `Viewer` without a
     forced password-reset prompt.
--   [ ] Confirm successful browser login for `starter-developer`.
+-   [ ] Confirm successful browser login for `Developer`.
 -   [ ] Confirm logout clears the application session and performs
     top-level navigation to Keycloak logout without the previously
     observed CORS error.
@@ -786,10 +786,10 @@ lower priority work until the current acceptance criteria are met.
 
 ### P0 --- Finish and verify authentication first
 
--   [ ] **P0.1** Test `starter-viewer` in a private browser window at
+-   [ ] **P0.1** Test `Viewer` in a private browser window at
     `http://localhost:3001`; verify it signs in without a password-reset
     prompt.
--   [ ] **P0.2** Test `starter-developer` the same way.
+-   [ ] **P0.2** Test `Developer` the same way.
 -   [ ] **P0.3** Verify the app shows the correct authenticated identity
     and role.
 -   [ ] **P0.4** Test sign-out; confirm both the app session and
@@ -853,7 +853,7 @@ at the server boundary and direct requests cannot bypass it.
 
 ### Deferred until foundational auth/RBAC works
 
--   \[DEFERRED\] Create a dedicated application `starter-admin` account
+-   \[DEFERRED\] Create a dedicated application `Admin` account
     and assign the application admin role. This is not the Keycloak
     `master` realm admin.
 -   \[DEFERRED\] Build a full application user-management console.

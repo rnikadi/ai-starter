@@ -122,7 +122,7 @@ ensure_user() {
         process.stdin.on("data", c => input += c);
         process.stdin.on("end", () => {
           const users = JSON.parse(input);
-          const user = users.find(u => u.username === process.env.USERNAME);
+          const user = users.find(u => u.username?.toLowerCase() === process.env.USERNAME.toLowerCase());
           if (user) process.stdout.write(user.id);
         });
       '
@@ -140,6 +140,29 @@ ensure_user() {
     echo "Found existing demo user: ${username}"
   fi
 
+  user_json="$(
+    docker exec keycloak "$KCADM" get users \
+      -r "$REALM" -q "username=${username}"
+  )"
+
+  user_id="$(
+    printf '%s' "$user_json" |
+      USERNAME="$username" node -e '
+        let input = "";
+        process.stdin.on("data", c => input += c);
+        process.stdin.on("end", () => {
+          const users = JSON.parse(input);
+          const user = users.find(u => u.username?.toLowerCase() === process.env.USERNAME.toLowerCase());
+          if (user) process.stdout.write(user.id);
+        });
+      '
+  )"
+
+  if [[ -z "$user_id" ]]; then
+    echo "ERROR: Could not retrieve the ID for ${username}." >&2
+    exit 1
+  fi
+
   docker exec keycloak "$KCADM" set-password \
     -r "$REALM" \
     --username "$username" \
@@ -149,7 +172,6 @@ ensure_user() {
   docker exec keycloak "$KCADM" update "users/${user_id}" \
     -r "$REALM" \
     -s enabled=true \
-    -s 'requiredActions=[]' \
     >/dev/null
 
   user_json="$(
@@ -163,7 +185,7 @@ ensure_user() {
       process.stdin.on("data", c => input += c);
       process.stdin.on("end", () => {
         const users = JSON.parse(input);
-        const user = users.find(u => u.username === process.env.USERNAME);
+        const user = users.find(u => u.username?.toLowerCase() === process.env.USERNAME.toLowerCase());
         if (!user) {
           console.error("ERROR: User lookup failed.");
           process.exit(1);
@@ -180,7 +202,7 @@ ensure_user() {
       });
     '
 
-  if ! docker exec keycloak "$KCADM" get roles \
+  if ! docker exec keycloak "$KCADM" get-roles \
     -r "$REALM" --uusername "$username" 2>/dev/null |
     grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${role}\""; then
     docker exec keycloak "$KCADM" add-roles \
@@ -193,8 +215,8 @@ ensure_user() {
   echo "Configured ${username} (role: ${role}; default development password set)."
 }
 
-ensure_user "starter-developer" "StarterDev123!" "developer"
-ensure_user "starter-viewer" "StarterView123!" "viewer"
+ensure_user "developer" "password" "developer"
+ensure_user "viewer" "password" "viewer"
 
 echo
 echo "Keycloak bootstrap completed successfully."

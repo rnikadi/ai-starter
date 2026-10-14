@@ -44,3 +44,5 @@ next-env.d.ts
 # Public-safe environment templates
 !.env.example
 !.env.keycloak.example
+terminal-admin-review.out
+.local-demo-credentials-backup-20261014-105506/
