@@ -2,6 +2,7 @@
 
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
 
 const CYAN = "\x1b[36m";
@@ -52,6 +53,15 @@ function ensureDockerInfrastructure() {
     }
   }
 
+  // Ensure host logs directory and initial log files exist for Promtail volume mount
+  fs.mkdirSync("logs", { recursive: true });
+  for (const file of ["backend.log", "frontend.log", "dev.log"]) {
+    const logPath = path.join("logs", file);
+    if (!fs.existsSync(logPath)) {
+      fs.writeFileSync(logPath, "");
+    }
+  }
+
   log("Starting infrastructure and observability containers (docker compose --profile monitoring up -d)...");
   try {
     const envFileArgs = fs.existsSync(".env.local")
@@ -84,6 +94,7 @@ function printDashboard() {
   console.log(`  ${BOLD}Prometheus Metrics:${RESET}    http://localhost:9090`);
   console.log(`  ${BOLD}Loki Log Aggregation:${RESET}  http://localhost:3002 (Loki Explore)`);
   console.log(`  ${BOLD}Tempo Traces:${RESET}          http://localhost:3002 (Tempo Explore)`);
+  console.log(`  ${BOLD}Host Logs (Piped):${RESET}     logs/backend.log & logs/frontend.log -> Promtail`);
   console.log(`${BOLD}====================================================${RESET}`);
   console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop ONLY the frontend & backend dev servers.`);
   console.log(`  (Infrastructure and observability containers will remain running for fast restart)`);
@@ -94,16 +105,44 @@ function printDashboard() {
 // 3. Spawn child processes
 const children = [];
 
-function spawnProcess(command, args, label, color) {
+function spawnProcess(command, args, label, color, logFiles = []) {
   const child = spawn(command, args, {
-    stdio: "inherit",
+    stdio: ["inherit", "pipe", "pipe"],
     shell: true,
     env: { ...process.env },
   });
 
   children.push(child);
 
+  const streams = logFiles.map((file) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    return fs.createWriteStream(file, { flags: "a" });
+  });
+
+  // Strip ANSI color escape sequences from log files so Loki gets clean text or JSON
+  const stripAnsi = (str) =>
+    str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+
+  child.stdout.on("data", (chunk) => {
+    process.stdout.write(chunk);
+    const cleanText = stripAnsi(chunk.toString("utf8"));
+    for (const stream of streams) {
+      stream.write(cleanText);
+    }
+  });
+
+  child.stderr.on("data", (chunk) => {
+    process.stderr.write(chunk);
+    const cleanText = stripAnsi(chunk.toString("utf8"));
+    for (const stream of streams) {
+      stream.write(cleanText);
+    }
+  });
+
   child.on("exit", (code, signal) => {
+    for (const stream of streams) {
+      stream.end();
+    }
     if (signal) {
       log(`${color}${label}${RESET} exited due to signal ${signal}`);
     } else if (code !== 0 && code !== null) {
@@ -118,8 +157,14 @@ function spawnProcess(command, args, label, color) {
 ensureDockerInfrastructure();
 printDashboard();
 
-const backend = spawnProcess("pnpm", ["dev:backend"], "backend", CYAN);
-const frontend = spawnProcess("pnpm", ["dev:frontend"], "frontend", GREEN);
+const backend = spawnProcess("pnpm", ["dev:backend"], "backend", CYAN, [
+  "logs/backend.log",
+  "logs/dev.log",
+]);
+const frontend = spawnProcess("pnpm", ["dev:frontend"], "frontend", GREEN, [
+  "logs/frontend.log",
+  "logs/dev.log",
+]);
 
 // 5. Graceful Shutdown on Ctrl+C / SIGINT
 function handleShutdown() {

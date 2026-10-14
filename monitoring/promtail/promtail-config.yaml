@@ -55,3 +55,43 @@ scrape_configs:
       - labels:
           level:
           reqId:
+
+  - job_name: host-applications
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: host-applications
+          logging: promtail
+          __path__: /var/log/host-apps/*.log
+    relabel_configs:
+      # Exclude dev.log to avoid duplicating entries already in backend.log / frontend.log
+      - source_labels: ['__path__']
+        regex: '.*/dev\.log'
+        action: drop
+      # Extract service name from filename (backend.log -> backend, frontend.log -> frontend)
+      - source_labels: ['__path__']
+        regex: '.*/([^/]+)\.log'
+        target_label: 'service'
+      - source_labels: ['service']
+        target_label: 'service_name'
+      - source_labels: ['service']
+        target_label: 'container'
+    pipeline_stages:
+      # 1. Parse structured JSON logs if present
+      - json:
+          expressions:
+            level: level
+            reqId: reqId
+            msg: msg
+            time: time
+            statusCode: statusCode
+      # 2. Extract log level from plain text format [INFO], [WARN], [ERROR], [DEBUG]
+      - regex:
+          expression: '\[(?P<level_text>DEBUG|INFO|WARN|ERROR)\]'
+      - template:
+          source: level
+          template: '{{ if .level }}{{ .level }}{{ else if .level_text }}{{ ToLower .level_text }}{{ else }}info{{ end }}'
+      - labels:
+          level:
+          reqId:
