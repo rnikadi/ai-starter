@@ -21,10 +21,7 @@ integrates:
     application capabilities.
 
 The longer-term objective is to provide a reusable foundation for
-AI-powered
-
-DevOps applications, including DevOps configuration generation and
-validation.
+AI-powered web applications with role-based access control.
 
 The project must distinguish between capabilities already implemented,
 
@@ -334,16 +331,16 @@ before assuming that every exported setting has been applied.
 
 -   [ ] Prevent the LLM from deciding its own authorization privileges.
 
-### 4.5 DevOps configuration capabilities\*\*
+### 4.5 Application capabilities\*\*
 
--   [ ] Define structured DevOps configuration-generation requests.
+-   [ ] Define structured application task requests.
 
--   [ ] Accept natural-language requirements for supported configuration
+-   [ ] Accept natural-language requirements for supported application
     tasks.
 
--   [ ] Generate configuration artifacts.
+-   [ ] Generate application artifacts or structured responses.
 
--   [ ] Validate generated artifacts deterministically.
+-   [ ] Validate generated outputs deterministically.
 
 -   [ ] Report validation errors clearly.
 
@@ -351,9 +348,9 @@ before assuming that every exported setting has been applied.
 
 -   [ ] Require explicit authorization for privileged execution.
 
--   [ ] Do not execute generated commands or configurations implicitly.
+-   [ ] Do not execute generated commands or actions implicitly.
 
--   [ ] Add focused tests for configuration-generation behavior.
+-   [ ] Add focused tests for application task behavior.
 
 ### 4.6 Administration capabilities\*\*
 
@@ -542,7 +539,7 @@ capability.
 
 ## 9. OTHER / IDEAS\*\*
 
--   \[IDEA\] Add structured DevOps configuration templates.
+-   \[IDEA\] Add structured application task templates.
 
 -   \[IDEA\] Add deterministic validation for generated artifacts.
 

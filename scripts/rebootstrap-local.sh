@@ -3,7 +3,6 @@
 set -Eeuo pipefail
 
 PROJECT_NAME="ai-starter"
-EXPECTED_ROOT="/Users/ramachandraiah.nikadi/Projects/Personal/github/javascript/ai-devops-configuration-expert"
 REALM="ai-starter"
 KEYCLOAK_URL="http://localhost:8080"
 ARCHestra_URL="http://localhost:3000"
@@ -19,9 +18,9 @@ printf '\n========== Local Environment Rebootstrap ==========\n'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-if [[ "$ROOT_DIR" != "$EXPECTED_ROOT" ]]; then
+if [[ ! -f "$ROOT_DIR/package.json" || ! -f "$ROOT_DIR/docker-compose.yaml" ]]; then
   printf 'ERROR: Unexpected repository directory: %s\n' "$ROOT_DIR" >&2
-  printf 'Expected: %s\n' "$EXPECTED_ROOT" >&2
+  printf 'Could not find package.json and docker-compose.yaml in the project root.\n' >&2
   exit 1
 fi
 

@@ -21,13 +21,13 @@ async function HomeContent() {
             AI
           </div>
 
-          <p className="eyebrow">AI PLATFORM ENGINEERING</p>
+          <p className="eyebrow">AI APPLICATION STARTER</p>
 
           <h1>{appConfig.displayName}</h1>
 
           <p className="muted">
-            Configure, validate, and explore DevOps proof-of-concept
-            environments through a single workspace.
+            Build, validate, and explore AI-powered application
+            capabilities through a single workspace.
           </p>
 
           <div className="feature-list">
@@ -93,12 +93,6 @@ async function HomeContent() {
                 : "No realm roles detected"}
             </span>
           </div>
-
-          {isAdmin && (
-            <Link className="access-pill allowed" href="/admin">
-              Admin console
-            </Link>
-          )}
 
           {isAdmin && (
             <Link className="access-pill allowed" href="/admin">
@@ -187,7 +181,7 @@ export default function Home() {
       fallback={
         <main className="page-shell">
           <section className="login-card">
-            <p className="eyebrow">AI PLATFORM ENGINEERING</p>
+            <p className="eyebrow">AI APPLICATION STARTER</p>
             <h1>Loading your workspace</h1>
             <p className="muted">Checking your authentication session...</p>
           </section>

@@ -16,7 +16,7 @@
       },
       {
         "name": "developer",
-        "description": "Can use AI capabilities and generate and validate configurations."
+        "description": "Can access AI capabilities and run application tasks."
       },
       {
         "name": "admin",
