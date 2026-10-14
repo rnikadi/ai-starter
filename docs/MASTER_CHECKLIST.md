@@ -56,6 +56,12 @@ production-readiness requirements.
 
 -   [x] Reserve host port 3001 for the Next.js application.
 
+-   [x] Reserve host port 3002 for the Grafana Observability Dashboard.
+
+-   [x] Reserve host port 3100 for the Grafana Loki log aggregation service.
+
+-   [x] Reserve host port 4000 for the standalone Node.js API backend.
+
 -   [x] Reserve host port 9000 for the Archestra LLM proxy.
 
 -   [x] Configure Keycloak to use host port 8080.
@@ -67,6 +73,10 @@ production-readiness requirements.
 -   [x] Configure persistent Docker volumes in the Compose definition.
 
 -   [x] Preserve existing Archestra external volumes.
+
+-   [x] Configure multi-stage production Dockerfiles for frontend and backend.
+
+-   [x] Configure unified observability stack with Grafana, Loki, and Promtail.
 
 -   [ ] Verify all running containers and persistent volumes after
     startup.
@@ -261,67 +271,89 @@ before assuming that every exported setting has been applied.
 
 ### 4.1 Authentication UI\*\*
 
--   [ ] Create the login page.
+-   [x] Create the login page.
 
--   [ ] Initiate login through Keycloak using OIDC authorization code
+-   [x] Initiate login through Keycloak using OIDC authorization code
     flow.
 
--   [ ] Handle successful authentication and application return
+-   [x] Handle successful authentication and application return
     navigation.
 
--   [ ] Handle authentication errors.
+-   [x] Handle authentication errors.
 
--   [ ] Implement logout.
+-   [x] Implement logout.
 
--   [ ] Protect authenticated application pages.
+-   [x] Protect authenticated application pages.
 
--   [ ] Display an appropriate unauthenticated state.
+-   [x] Display an appropriate unauthenticated state.
 
--   [ ] Test session expiry and logout behavior.
+-   [ ] Test session expiry and logout behavior in live browser.
 
 ### 4.2 Application dashboard\*\*
 
--   [ ] Display the authenticated user's identity.
+-   [x] Display the authenticated user's identity.
 
--   [ ] Display the effective application roles.
+-   [x] Display the effective application roles.
 
--   [ ] Provide role-aware navigation.
+-   [x] Provide role-aware navigation.
 
--   [ ] Display useful authorization-denied feedback.
+-   [x] Display useful authorization-denied feedback.
 
--   [ ] Ensure the UI does not become the sole authorization control.
+-   [x] Ensure the UI does not become the sole authorization control.
 
 ### 4.3 AI interaction UI\*\*
 
--   [ ] Add a prompt input and submit action.
+-   [x] Add a prompt input and submit action.
 
--   [ ] Display the Mastra agent response.
+-   [x] Display the Mastra agent response.
 
--   [ ] Display loading and error states.
+-   [x] Display loading and error states.
 
--   [ ] Connect the UI to the AI API.
+-   [x] Connect the UI to the AI API.
 
--   [ ] Require authentication before accessing the protected AI
+-   [x] Require authentication before accessing the protected AI
     operation.
 
--   [ ] Preserve the existing AI integration contract where practical.
+-   [x] Preserve the existing AI integration contract where practical.
 
--   [ ] Ensure confidential provider credentials never reach browser
+-   [x] Ensure confidential provider credentials never reach browser
     code.
 
 ### 4.4 Authorization model\*\*
 
--   [ ] Define a reusable application permission model.
+-   [x] Define a reusable application permission model.
 
--   [ ] Map trusted Keycloak roles to application permissions.
+-   [x] Map trusted Keycloak roles to application permissions.
 
--   [ ] Define the initial capabilities available to `viewer`.
+-   [x] Define the initial capabilities available to `viewer`.
 
--   [ ] Define the initial capabilities available to `developer`.
+-   [x] Define the initial capabilities available to `developer`.
 
--   [ ] Define the initial capabilities available to `admin`.
+-   [x] Define the initial capabilities available to `admin`.
 
--   [ ] Enforce authorization on the server.
+-   [x] Enforce authorization on the server.
+
+-   [x] Enforce RBAC middleware guards (`guardAuth`, `guardRoles`).
+
+### 4.5 Platform plumbing & Observability\*\*
+
+-   [x] Implement structured JSON logging with correlation IDs (`x-request-id`).
+
+-   [x] Implement standardized liveness probe (`/healthz`) and readiness probe (`/readyz`).
+
+-   [x] Implement fail-fast Zod environment schema validation on boot.
+
+-   [x] Implement in-memory API rate limiting (`apiRateLimiter`, `aiRateLimiter`).
+
+-   [x] Implement OpenAPI 3.1 specification (`/openapi.json`) and offline documentation (`/docs`).
+
+-   [x] Implement offline mock AI mode (`MOCK_AI=true`).
+
+-   [x] Configure production multi-stage Dockerfiles for frontend and backend.
+
+-   [x] Configure centralized visual logging stack with Grafana, Loki, and Promtail.
+
+-   [x] Implement GitHub Actions CI verification workflow (`.github/workflows/ci.yml`).
 
 -   [ ] Return HTTP 401 for unauthenticated protected requests.
 

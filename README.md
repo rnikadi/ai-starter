@@ -19,6 +19,8 @@ AI Starter provides a small web application, an AI integration path through an L
 - [Keycloak and local test users](#keycloak-and-local-test-users)
 - [Run the application](#run-the-application)
 - [Test the AI integration](#test-the-ai-integration)
+- [Platform features and architecture](#platform-features-and-architecture)
+- [Observability and Grafana logging](#observability-and-grafana-logging)
 - [Validation commands](#validation-commands)
 - [Credentials and secrets](#credentials-and-secrets)
 - [Daily Docker operations](#daily-docker-operations)
@@ -37,7 +39,7 @@ Browser
   v
 Frontend (Next.js) :3001
   |  Auth.js / Keycloak OIDC (:8080)
-  |  HTTP requests with Bearer token
+  |  HTTP requests with Bearer token & x-request-id
   v
 Backend (Node.js API) :4000
   |  JWT Bearer token verification & RBAC
@@ -48,9 +50,11 @@ Archestra LLM proxy :9000
   v
 Configured model provider (for example, OpenRouter)
 
-Local infrastructure:
-  Archestra UI :3000
-  Keycloak     :8080
+Local infrastructure & Observability:
+  Archestra UI          :3000
+  Keycloak              :8080
+  Grafana Observability :3002
+  Loki Log Aggregator   :3100
 ```
 
 ## Components and local addresses
@@ -507,6 +511,76 @@ AI Starter provides production-grade backend plumbing designed to remain generic
 
 ### 8. Automated CI workflow
 - `.github/workflows/ci.yml` runs automated tests, typechecks, linting, and production builds on push and pull requests.
+
+## Observability and Grafana logging
+
+AI Starter includes a centralized, visual observability stack powered by **Grafana, Loki, and Promtail**. It collects and streams live logs from all running services into a single, searchable dashboard.
+
+### 1. Accessing Grafana
+
+- **URL:** [http://localhost:3002](http://localhost:3002)
+- **Default credentials:**
+  - **Username:** `admin`
+  - **Password:** `admin`
+- **Default Datasource:** Grafana Loki (`http://loki:3100`) is pre-provisioned automatically.
+- **Pre-loaded Dashboard:** Open **Dashboards** &rarr; **AI Starter** &rarr; **Application Logs Overview**.
+
+### 2. Log Ingestion Architecture
+
+```text
+Docker Containers (stdout/stderr)
+  ├── keycloak   (OIDC authentications, realm events, tokens)
+  ├── archestra  (LLM proxy requests, upstream model inference)
+  ├── backend    (Mastra agents, structured JSON logs, RBAC)
+  └── frontend   (Next.js SSR, Auth.js session handlers, BFF)
+        │
+        ▼
+   Promtail (Scrapes /var/run/docker.sock, extracts labels)
+        │
+        ▼
+   Grafana Loki (:3100) (Indexes logs by service, level, reqId)
+        │
+        ▼
+   Grafana Dashboard (:3002) (Interactive log stream & visual metrics)
+```
+
+### 3. LogQL Querying & Search Examples
+
+In Grafana **Explore** (`http://localhost:3002/explore`), choose **Loki** as the datasource and try these queries:
+
+| Use Case | LogQL Query |
+|---|---|
+| **View Keycloak logs** | `{service="keycloak"}` |
+| **View Archestra LLM gateway logs** | `{service="archestra"}` |
+| **View Backend API logs** | `{service="backend"}` |
+| **View Frontend Next.js logs** | `{service="frontend"}` |
+| **Trace a request across all services** | `{service=~".*"} \|= "YOUR_X_REQUEST_ID"` |
+| **Filter all errors across all containers** | `{service=~".*"} \|~ "(?i)(error\|fatal\|fail\|exception)"` |
+| **Parse backend structured JSON fields** | `{service="backend"} \| json \| statusCode >= 400` |
+
+### 4. Zero Overlap Guarantee
+
+The observability system is purely **read-only and non-intrusive**:
+- **Keycloak** remains the single authority for user accounts and OIDC authentication. Grafana simply streams Keycloak's server logs.
+- **Archestra** remains the single authority for model proxying and virtual keys. Grafana simply streams Archestra's traffic logs.
+- **No custom logging libraries** or invasive agents are added to the core application—services log to standard output (`stdout`), and Promtail captures them automatically.
+
+### 5. Starting the Observability Stack
+
+You can launch Grafana in two ways:
+
+1. **Full Containerized Demo:**
+   ```bash
+   pnpm docker:demo      # Boots Frontend, Backend, Keycloak, Archestra, Loki, and Grafana
+   pnpm docker:down      # Stops all demo containers
+   ```
+
+2. **Standalone Observability with Local Host Dev:**
+   ```bash
+   pnpm dev              # Runs your host app on :3001 and :4000
+   pnpm monitoring:up    # In another terminal: launches Loki, Promtail, and Grafana (:3002)
+   pnpm monitoring:down  # Stops monitoring containers
+   ```
 
 ## Validation commands
 
