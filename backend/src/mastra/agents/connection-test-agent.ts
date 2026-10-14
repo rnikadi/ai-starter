@@ -10,28 +10,64 @@ const envPath = fs.existsSync(".env.local")
 
 dotenv.config({ path: envPath });
 
-const apiKey = process.env.ARCHESTRA_VIRTUAL_KEY || "missing-archestra-key";
-const baseURL = process.env.ARCHESTRA_BASE_URL || "http://localhost:9000/v1";
-const modelId = process.env.ARCHESTRA_MODEL || "missing-model-id";
+export function getArchestraBaseUrl(): string {
+  const configured = (process.env.ARCHESTRA_BASE_URL || "http://localhost:9000/v1").trim();
+  const internalUrl = process.env.ARCHESTRA_INTERNAL_URL?.trim();
 
-const archestra = createOpenAI({
-  apiKey,
-  baseURL,
-});
+  if (!internalUrl) {
+    return configured;
+  }
 
-export const connectionTestAgent = new Agent({
-  id: "archestra-connection-test",
-  name: "Archestra Connection Test",
-  instructions:
-    "You are an integration test agent. Follow the user instructions exactly.",
-  model: archestra.chat(modelId),
+  try {
+    const parsedConfigured = new URL(configured);
+    if (parsedConfigured.hostname === "localhost" || parsedConfigured.hostname === "127.0.0.1") {
+      const parsedInternal = new URL(internalUrl);
+      parsedConfigured.protocol = parsedInternal.protocol;
+      parsedConfigured.host = parsedInternal.host;
+      return parsedConfigured.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    return configured;
+  }
+
+  return configured;
+}
+
+export function createConnectionAgent(): Agent {
+  const apiKey = process.env.ARCHESTRA_VIRTUAL_KEY || "missing-archestra-key";
+  const baseURL = getArchestraBaseUrl();
+  const modelId = process.env.ARCHESTRA_MODEL || "missing-model-id";
+
+  const archestra = createOpenAI({
+    apiKey,
+    baseURL,
+  });
+
+  return new Agent({
+    id: "archestra-connection-test",
+    name: "Archestra Connection Test",
+    instructions:
+      "You are an integration test agent. Follow the user instructions exactly.",
+    model: archestra.chat(modelId),
+  });
+}
+
+export const connectionTestAgent: Agent = new Proxy({} as Agent, {
+  get(_target, prop) {
+    const agent = createConnectionAgent();
+    const value = (agent as unknown as Record<string | symbol, unknown>)[prop];
+    if (typeof value === "function") {
+      return value.bind(agent);
+    }
+    return value;
+  },
 });
 
 export function isArchestraConfigured(): boolean {
   return Boolean(
-    process.env.ARCHESTRA_VIRTUAL_KEY &&
-    process.env.ARCHESTRA_BASE_URL &&
-    process.env.ARCHESTRA_MODEL
+    process.env.ARCHESTRA_VIRTUAL_KEY?.trim() &&
+    (process.env.ARCHESTRA_BASE_URL?.trim() || getArchestraBaseUrl()) &&
+    process.env.ARCHESTRA_MODEL?.trim()
   );
 }
 
@@ -49,7 +85,8 @@ export async function runConnectionTest(
     };
   }
 
-  const result = await connectionTestAgent.generate(prompt);
+  const agent = createConnectionAgent();
+  const result = await agent.generate(prompt);
   return {
     text: result.text,
     mocked: false,

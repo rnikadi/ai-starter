@@ -39,7 +39,19 @@ async function handleKeycloakLogout(request: Request) {
     issuerUrl.origin,
   );
 
-  const returnUrl = new URL("/", request.url);
+  const authUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
+  let returnUrl: URL;
+
+  if (authUrl) {
+    returnUrl = new URL("/", authUrl);
+  } else {
+    returnUrl = new URL("/", request.url);
+  }
+
+  // Normalize 0.0.0.0 bind address to localhost so Keycloak receives an allowed redirect URI
+  if (returnUrl.hostname === "0.0.0.0") {
+    returnUrl.hostname = "localhost";
+  }
 
   logoutUrl.searchParams.set("client_id", clientId);
   logoutUrl.searchParams.set(

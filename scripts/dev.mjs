@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, execSync } from "node:child_process";
+import fs from "node:fs";
 import process from "node:process";
 
 const CYAN = "\x1b[36m";
@@ -34,6 +35,15 @@ function ensureDockerInfrastructure() {
     );
     warn("Please start Docker Desktop if you plan to sign in or test AI connectivity.\n");
     return;
+  }
+
+  if (!fs.existsSync(".env") || !fs.existsSync(".env.keycloak")) {
+    log("Required environment files are missing. Running ./setupscripts.sh...");
+    try {
+      execSync("./setupscripts.sh", { stdio: "inherit" });
+    } catch {
+      warn("Failed to run ./setupscripts.sh automatically.");
+    }
   }
 
   log("Starting Keycloak and Archestra infrastructure (docker compose up -d)...");

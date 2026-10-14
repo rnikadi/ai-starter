@@ -1,5 +1,9 @@
 import process from "node:process";
-import { isArchestraConfigured, isMockAiEnabled } from "../mastra/agents/connection-test-agent.js";
+import {
+  getArchestraBaseUrl,
+  isArchestraConfigured,
+  isMockAiEnabled,
+} from "../mastra/agents/connection-test-agent.js";
 import { getBackendEnv } from "../config/env.js";
 
 export interface LivenessReport {
@@ -135,9 +139,11 @@ export async function getReadinessReport(): Promise<{
   report: ReadinessReport;
 }> {
   const env = getBackendEnv();
+  const keycloakUrl = process.env.AUTH_KEYCLOAK_INTERNAL_URL || env.AUTH_KEYCLOAK_ISSUER;
+  const archestraUrl = getArchestraBaseUrl();
   const [keycloak, archestra] = await Promise.all([
-    checkKeycloakReadiness(env.AUTH_KEYCLOAK_ISSUER),
-    checkArchestraReadiness(env.ARCHESTRA_BASE_URL),
+    checkKeycloakReadiness(keycloakUrl),
+    checkArchestraReadiness(archestraUrl),
   ]);
 
   const allUp = keycloak.status === "up" && archestra.status === "up";

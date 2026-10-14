@@ -50,6 +50,41 @@ function extractIdTokenRoles(idToken: string | undefined): string[] {
   }
 }
 
+const keycloakIssuer =
+  process.env.AUTH_KEYCLOAK_ISSUER ||
+  "http://localhost:8080/realms/ai-starter";
+
+const internalKeycloakUrl = process.env.AUTH_KEYCLOAK_INTERNAL_URL;
+
+// When running inside Docker Compose, route server-to-server requests to internal Docker DNS
+// while keeping the public issuer (http://localhost:8080/...) for browser redirects and token validation
+if (typeof globalThis.fetch === "function" && internalKeycloakUrl) {
+  const originalFetch = globalThis.fetch;
+  const publicOrigin = new URL(keycloakIssuer).origin;
+  const internalOrigin = new URL(internalKeycloakUrl).origin;
+
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    let url: string;
+    if (typeof input === "string") {
+      url = input;
+    } else if (input instanceof URL) {
+      url = input.href;
+    } else {
+      url = input.url;
+    }
+
+    if (url.startsWith(publicOrigin)) {
+      const rewrittenUrl = url.replace(publicOrigin, internalOrigin);
+      if (input instanceof Request) {
+        return originalFetch(new Request(rewrittenUrl, input), init);
+      }
+      return originalFetch(rewrittenUrl, init);
+    }
+
+    return originalFetch(input, init);
+  };
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret:
@@ -61,9 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientId: process.env.AUTH_KEYCLOAK_ID || "ai-starter-web",
       clientSecret:
         process.env.AUTH_KEYCLOAK_SECRET || "ai-starter-kit-local-client-secret",
-      issuer:
-        process.env.AUTH_KEYCLOAK_ISSUER ||
-        "http://localhost:8080/realms/ai-starter",
+      issuer: keycloakIssuer,
     }),
   ],
 

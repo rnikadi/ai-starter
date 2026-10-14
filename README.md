@@ -424,6 +424,16 @@ pnpm docker:status
 pnpm docker:down
 ```
 
+> **How `pnpm docker:demo` works:**
+> 1. Verifies Docker Desktop is running and validates/initializes local environment files (`.env`, `.env.keycloak`, `.env.local` via `setupscripts.sh`).
+> 2. Builds and starts all containers in the background (`docker compose --profile full up -d --build`).
+> 3. Waits for Keycloak's OIDC realm discovery endpoint to become ready.
+> 4. Automatically executes identity bootstrap scripts (`bootstrap-keycloak-admin.sh` and `bootstrap-keycloak-users.sh`) to provision local demo users (`developer`, `viewer`, `admin`), assign realm roles, and verify client redirect URIs.
+> 5. Waits for Frontend, Backend, and Grafana readiness probes.
+> 6. Displays a comprehensive service and credential dashboard in the console.
+>
+> *(Tip: For subsequent runs where Docker images are already built, run `pnpm docker:demo:quick` to start immediately without rebuilding images).*
+
 #### Optional: Standalone Observability with Host Dev
 
 If you are developing locally with `pnpm dev` and want to spin up Grafana & Loki to visualize logs and metrics from Keycloak and Archestra:

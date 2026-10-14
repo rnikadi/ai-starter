@@ -11,7 +11,13 @@ const AI_ACCESS_ROLES = new Set<string>(["developer", "admin"]);
 
 async function HomeContent() {
   await connection();
-  const session = await auth();
+  let session = null;
+  try {
+    session = await auth();
+  } catch {
+    // If a stale or invalid session cookie is present, treat as unauthenticated
+    session = null;
+  }
 
   if (!session?.user) {
     return (

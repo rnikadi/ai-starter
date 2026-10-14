@@ -7,7 +7,12 @@ import { appConfig } from "@/lib/app-config";
 import { KeycloakSignOutButton } from "@/components/auth/keycloak-sign-out-button";
 
 async function AdminContent() {
-  const session = await auth();
+  let session = null;
+  try {
+    session = await auth();
+  } catch {
+    redirect("/");
+  }
 
   if (!session?.user) {
     redirect("/");

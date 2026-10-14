@@ -53,9 +53,21 @@ export async function POST(request: Request) {
     });
 
     const data = (await backendResponse.json()) as unknown;
-    reqLogger.info("Backend response received", {
-      statusCode: backendResponse.status,
-    });
+    if (backendResponse.status >= 500) {
+      reqLogger.error("Backend error received on /api/ai/test", {
+        statusCode: backendResponse.status,
+        data,
+      });
+    } else if (backendResponse.status >= 400) {
+      reqLogger.warn("Backend rejected request on /api/ai/test", {
+        statusCode: backendResponse.status,
+        data,
+      });
+    } else {
+      reqLogger.info("Backend response received on /api/ai/test", {
+        statusCode: backendResponse.status,
+      });
+    }
     return NextResponse.json(data, {
       status: backendResponse.status,
       headers: { "x-request-id": reqId },

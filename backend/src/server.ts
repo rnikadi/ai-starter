@@ -78,13 +78,20 @@ export function createBackendServer(): http.Server {
       return;
     }
 
-    // Log response completion
+    // Log response completion with appropriate severity for observability
     res.on("finish", () => {
       const durationMs = Math.round(performance.now() - startTime);
-      reqLogger.info(`${req.method} ${pathname} ${res.statusCode}`, {
+      const logData = {
         statusCode: res.statusCode,
         durationMs,
-      });
+      };
+      if (res.statusCode >= 500) {
+        reqLogger.error(`${req.method} ${pathname} ${res.statusCode}`, logData);
+      } else if (res.statusCode >= 400) {
+        reqLogger.warn(`${req.method} ${pathname} ${res.statusCode}`, logData);
+      } else {
+        reqLogger.info(`${req.method} ${pathname} ${res.statusCode}`, logData);
+      }
     });
 
     // 2. Health & Readiness Probes (bypass general rate limits)
@@ -160,19 +167,30 @@ export function createBackendServer(): http.Server {
       }
 
       if (!isMockAiEnabled() && !isArchestraConfigured()) {
+        const errorMsg =
+          "Archestra gateway is not fully configured in .env.local (ARCHESTRA_VIRTUAL_KEY, ARCHESTRA_BASE_URL, or ARCHESTRA_MODEL is missing). Set MOCK_AI=true to test offline.";
+        reqLogger.error("Archestra gateway configuration missing or incomplete", {
+          error: errorMsg,
+          hasVirtualKey: Boolean(process.env.ARCHESTRA_VIRTUAL_KEY?.trim()),
+          hasBaseUrl: Boolean(process.env.ARCHESTRA_BASE_URL?.trim()),
+          hasModel: Boolean(process.env.ARCHESTRA_MODEL?.trim()),
+        });
         sendJson(res, 500, {
-          error:
-            "Archestra gateway is not fully configured in .env.local (ARCHESTRA_VIRTUAL_KEY, ARCHESTRA_BASE_URL, or ARCHESTRA_MODEL is missing). Set MOCK_AI=true to test offline.",
+          error: errorMsg,
         });
         return;
       }
 
       try {
         const result = await runConnectionTest(validation.prompt);
+        reqLogger.info("AI connection test completed successfully", {
+          mocked: result.mocked,
+        });
         sendJson(res, 200, { result: result.text, mocked: result.mocked });
       } catch (error) {
         reqLogger.error("AI connection test failed.", {
           err: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
         });
         sendJson(res, 502, {
           error: "AI request failed. Check backend server logs for details.",

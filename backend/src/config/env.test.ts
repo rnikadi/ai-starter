@@ -28,5 +28,17 @@ describe("Environment Validation", () => {
     const result = validateBackendEnv({ BACKEND_PORT: "not-a-number" });
     expect(result.valid).toBe(false);
   });
+
+  it("accepts valid internal URLs for keycloak and archestra", () => {
+    const result = validateBackendEnv({
+      AUTH_KEYCLOAK_INTERNAL_URL: "http://keycloak:8080/realms/ai-starter",
+      ARCHESTRA_INTERNAL_URL: "http://archestra:9000",
+    });
+    expect(result.valid).toBe(true);
+    expect(result.data?.AUTH_KEYCLOAK_INTERNAL_URL).toBe(
+      "http://keycloak:8080/realms/ai-starter",
+    );
+    expect(result.data?.ARCHESTRA_INTERNAL_URL).toBe("http://archestra:9000");
+  });
 });
 

@@ -73,8 +73,9 @@ CLIENT_UUID="$(
 
 docker exec keycloak "$KCADM" update "clients/${CLIENT_UUID}" \
   -r "$REALM" \
-  -s 'redirectUris=["http://localhost:3001/*"]' \
-  -s 'webOrigins=["http://localhost:3001"]' \
+  -s 'redirectUris=["http://localhost:3001/*","http://127.0.0.1:3001/*"]' \
+  -s 'webOrigins=["http://localhost:3001","http://127.0.0.1:3001","+"]' \
+  -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"http://localhost:3001/*##http://127.0.0.1:3001/*##+"}' \
   >/dev/null
 
 CLIENT_JSON="$(
@@ -91,8 +92,7 @@ printf '%s' "$CLIENT_JSON" |
         c.enabled === true &&
         (c.redirectUris || []).includes("http://localhost:3001/*") &&
         (c.webOrigins || []).includes("http://localhost:3001") &&
-        c.attributes?.["post.logout.redirect.uris"] ===
-          "http://localhost:3001/*";
+        Boolean(c.attributes?.["post.logout.redirect.uris"]?.includes("http://localhost:3001/*"));
 
       if (!valid) {
         console.error("ERROR: Keycloak client redirect configuration is incomplete.");

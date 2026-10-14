@@ -695,7 +695,7 @@ workflow
 -   [x] **OIDC Authentication:** NextAuth (Auth.js v5 beta) configured with Keycloak provider, PKCE code challenge, and federated logout.
 -   [x] **Role-Based Access Control:** Realm roles (`viewer`, `developer`, `admin`) extracted into JWT session and enforced server-side.
 -   [x] **AI Agent Integration:** Mastra agent configured to route requests through Archestra LLM gateway (`http://localhost:9000/v1`).
--   [x] **Identity Bootstrapping:** Local automated scripts for administrator (`bootstrap-keycloak-admin.sh`) and demo users (`bootstrap-keycloak-users.sh`).
+-   [x] **Identity Bootstrapping:** Local automated scripts for administrator (`bootstrap-keycloak-admin.sh`) and demo users (`bootstrap-keycloak-users.sh`), automatically executed during `pnpm docker:demo` via `scripts/docker-demo.mjs`.
 -   [x] **Documentation Consolidaton:** Unified test credentials and development workflow in `README.md`.
 
 ### Next Milestones & Planned Capabilities

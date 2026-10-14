@@ -5,9 +5,11 @@ export const backendEnvSchema = z.object({
   PORT: z.coerce.number().optional(),
   HOST: z.string().default("0.0.0.0"),
   AUTH_KEYCLOAK_ISSUER: z.string().url().default("http://localhost:8080/realms/ai-starter"),
+  AUTH_KEYCLOAK_INTERNAL_URL: z.string().url().optional(),
   AUTH_KEYCLOAK_ID: z.string().default("ai-starter-web"),
   AUTH_KEYCLOAK_SECRET: z.string().optional(),
   ARCHESTRA_BASE_URL: z.string().url().default("http://localhost:9000/v1"),
+  ARCHESTRA_INTERNAL_URL: z.string().url().optional(),
   ARCHESTRA_VIRTUAL_KEY: z.string().optional(),
   ARCHESTRA_MODEL: z.string().optional(),
   MOCK_AI: z

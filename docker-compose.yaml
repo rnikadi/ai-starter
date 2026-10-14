@@ -5,6 +5,8 @@ services:
     image: archestra/platform:1.4.0-rc.36@sha256:b673affbc4f6704ba181b815ab7ce8352397ee084702742d6ee93159551bac2f
     container_name: archestra
     restart: unless-stopped
+    labels:
+      logging: "promtail"
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:9000:9000"
@@ -16,6 +18,8 @@ services:
     image: quay.io/keycloak/keycloak:26.7.0
     container_name: keycloak
     restart: unless-stopped
+    labels:
+      logging: "promtail"
     command:
       - start-dev
       - --import-realm
@@ -25,6 +29,7 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+      KC_HOSTNAME: "http://localhost:8080"
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -38,17 +43,22 @@ services:
       dockerfile: backend/Dockerfile
     container_name: ai-starter-backend
     restart: unless-stopped
+    labels:
+      logging: "promtail"
     profiles: ["full"]
     ports:
       - "127.0.0.1:4000:4000"
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     environment:
       BACKEND_PORT: "4000"
       HOST: "0.0.0.0"
       AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
-      ARCHESTRA_BASE_URL: "http://archestra:9000/v1"
-      ARCHESTRA_VIRTUAL_KEY: "${ARCHESTRA_VIRTUAL_KEY:-}"
-      ARCHESTRA_MODEL: "${ARCHESTRA_MODEL:-}"
-      MOCK_AI: "${MOCK_AI:-false}"
+      AUTH_KEYCLOAK_INTERNAL_URL: "http://keycloak:8080/realms/ai-starter"
+      ARCHESTRA_INTERNAL_URL: "http://archestra:9000"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_FORMAT: "json"
     depends_on:
@@ -67,19 +77,24 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: ai-starter-frontend
     restart: unless-stopped
+    labels:
+      logging: "promtail"
     profiles: ["full"]
     ports:
       - "127.0.0.1:3001:3001"
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     environment:
       PORT: "3001"
       HOSTNAME: "0.0.0.0"
       BACKEND_URL: "http://backend:4000"
       NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
       AUTH_URL: "http://localhost:3001"
-      AUTH_SECRET: "${AUTH_SECRET:-local-development-secret-key-32chars}"
-      AUTH_KEYCLOAK_ID: "${AUTH_KEYCLOAK_ID:-ai-starter-web}"
       AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
-      AUTH_KEYCLOAK_SECRET: "${AUTH_KEYCLOAK_SECRET:-ai-starter-kit-local-client-secret}"
+      AUTH_KEYCLOAK_INTERNAL_URL: "http://keycloak:8080/realms/ai-starter"
       LOG_FORMAT: "json"
     depends_on:
       backend:
@@ -124,6 +139,8 @@ services:
     image: prom/prometheus:v2.54.1
     container_name: ai-starter-prometheus
     restart: unless-stopped
+    labels:
+      logging: "promtail"
     profiles: ["full", "monitoring"]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -139,6 +156,8 @@ services:
     image: grafana/grafana:11.4.0
     container_name: ai-starter-grafana
     restart: unless-stopped
+    labels:
+      logging: "promtail"
     profiles: ["full", "monitoring"]
     ports:
       - "127.0.0.1:3002:3000"
