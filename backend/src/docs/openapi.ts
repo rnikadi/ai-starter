@@ -90,11 +90,138 @@ export const openapiSpec = {
         },
       },
     },
+    "/api/conversations": {
+      get: {
+        summary: "List user conversations",
+        description: "Returns all conversations belonging to the authenticated user.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "List of conversations",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationListResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      post: {
+        summary: "Create a new conversation",
+        description: "Creates an empty conversation thread for the authenticated user.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateConversationRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Conversation created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationDetailResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/conversations/{id}": {
+      get: {
+        summary: "Get conversation metadata",
+        description: "Returns conversation metadata by ID for the authenticated owner.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Conversation UUID",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Conversation found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationDetailResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        summary: "Delete a conversation",
+        description: "Permanently deletes a conversation and all its messages.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Conversation UUID",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Conversation deleted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { success: { type: "boolean" } },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/api/conversations/{id}/messages": {
+      get: {
+        summary: "List conversation messages",
+        description: "Returns all messages within a conversation thread in chronological order.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Conversation UUID",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Chronological list of conversation messages",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationMessagesResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/api/ai/test": {
       post: {
         summary: "Execute AI agent prompt",
         description:
-          "Executes the Mastra connection test agent against the Archestra LLM gateway. Requires 'developer' or 'admin' role.",
+          "Executes the Mastra connection test agent against the Archestra LLM gateway. Requires 'developer' or 'admin' role. Optionally persists into a conversation thread if conversationId is provided.",
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
@@ -120,6 +247,7 @@ export const openapiSpec = {
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" },
           "429": { $ref: "#/components/responses/TooManyRequests" },
           "502": { $ref: "#/components/responses/BadGateway" },
         },
@@ -181,6 +309,60 @@ export const openapiSpec = {
           },
         },
       },
+      Conversation: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          userId: { type: "string" },
+          title: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      Message: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          conversationId: { type: "string", format: "uuid" },
+          role: { type: "string", enum: ["user", "assistant", "system"] },
+          content: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      CreateConversationRequest: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            example: "Architecture discussion",
+            description: "Optional conversation title (default: New Conversation)",
+          },
+        },
+      },
+      ConversationListResponse: {
+        type: "object",
+        properties: {
+          conversations: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Conversation" },
+          },
+        },
+      },
+      ConversationDetailResponse: {
+        type: "object",
+        properties: {
+          conversation: { $ref: "#/components/schemas/Conversation" },
+        },
+      },
+      ConversationMessagesResponse: {
+        type: "object",
+        properties: {
+          messages: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Message" },
+          },
+        },
+      },
       AiTestRequest: {
         type: "object",
         required: ["prompt"],
@@ -190,6 +372,12 @@ export const openapiSpec = {
             description: "Prompt to execute against Mastra agent",
             example: "Say hello and confirm AI connectivity",
           },
+          conversationId: {
+            type: "string",
+            format: "uuid",
+            description: "Optional conversation UUID to persist user prompt and AI response",
+            example: "123e4567-e89b-12d3-a456-426614174000",
+          },
         },
       },
       AiTestResponse: {
@@ -198,6 +386,11 @@ export const openapiSpec = {
           result: {
             type: "string",
             example: "AI connection confirmed successfully.",
+          },
+          conversationId: {
+            type: "string",
+            format: "uuid",
+            description: "Persisted conversation UUID if provided in request",
           },
         },
       },
@@ -227,6 +420,14 @@ export const openapiSpec = {
       },
       Forbidden: {
         description: "Insufficient realm roles",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ErrorResponse" },
+          },
+        },
+      },
+      NotFound: {
+        description: "Resource not found",
         content: {
           "application/json": {
             schema: { $ref: "#/components/schemas/ErrorResponse" },

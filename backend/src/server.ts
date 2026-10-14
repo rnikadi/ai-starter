@@ -10,6 +10,16 @@ import { getBackendEnv } from "./config/env.js";
 import { getLivenessReport, getReadinessReport } from "./lib/health.js";
 import { openapiSpec, renderDocsHtml } from "./docs/openapi.js";
 import { logger, generateRequestId, type Logger } from "./lib/logger.js";
+import {
+  createConversation,
+  listUserConversations,
+  getConversationById,
+  getConversationMessages,
+  addConversationMessage,
+  deleteConversation,
+  getDatabaseStats,
+  clearAllConversations,
+} from "./db/repository.js";
 
 function getAllowedOrigins(): string[] {
   const env = getBackendEnv();
@@ -52,10 +62,10 @@ function setCorsHeaders(res: ServerResponse, origin?: string): void {
   if (selectedOrigin) {
     res.setHeader("Access-Control-Allow-Origin", selectedOrigin);
   }
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, x-user-roles, x-request-id",
+    "Content-Type, Authorization, x-user-roles, x-user-id, x-user-email, x-request-id",
   );
   res.setHeader("Access-Control-Allow-Credentials", "true");
 }
@@ -157,22 +167,194 @@ export function createBackendServer(): http.Server {
       return;
     }
 
-    // 5. Admin Status Endpoint
+    // 5. Admin Status & Management Endpoints
     if (req.method === "GET" && pathname === "/api/admin/status") {
       const user = await guardAuth(req, res);
       if (!user) return;
 
       if (!guardRoles(res, user, ["admin"])) return;
 
+      const { report: readiness } = await getReadinessReport();
+      const liveness = getLivenessReport();
+
+      let dbStats = { status: "healthy", totalConversations: 0, totalMessages: 0 };
+      try {
+        dbStats = await getDatabaseStats();
+      } catch (dbErr) {
+        reqLogger.warn("Admin status could not fetch db metrics", {
+          err: dbErr instanceof Error ? dbErr.message : String(dbErr),
+        });
+        dbStats.status = "unavailable";
+      }
+
       sendJson(res, 200, {
         authenticated: true,
         authorized: true,
-        capabilities: ["admin:access"],
+        capabilities: [
+          "admin:access",
+          "system:diagnostics",
+          "database:manage",
+          "observability:view",
+        ],
+        adminUser: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          roles: user.roles,
+        },
+        system: {
+          service: liveness.service,
+          uptimeSeconds: liveness.uptimeSeconds,
+          node: liveness.node,
+          memory: liveness.memory,
+        },
+        dependencies: readiness.checks,
+        database: dbStats,
       });
       return;
     }
 
-    // 6. AI Test Endpoint
+    if (req.method === "POST" && pathname === "/api/admin/conversations/clear") {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      if (!guardRoles(res, user, ["admin"])) return;
+
+      try {
+        await clearAllConversations();
+        reqLogger.info("Admin cleared all conversations and messages");
+        sendJson(res, 200, { success: true, message: "All platform conversations cleared." });
+      } catch (err) {
+        reqLogger.error("Failed to clear platform conversations", {
+          err: err instanceof Error ? err.message : String(err),
+        });
+        sendJson(res, 500, { error: "Failed to clear platform conversations." });
+      }
+      return;
+    }
+
+    // 6. Conversations Endpoints
+    if (req.method === "GET" && pathname === "/api/conversations") {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      const userId = user.id || user.email || "unknown";
+      try {
+        const list = await listUserConversations(userId);
+        sendJson(res, 200, { conversations: list });
+      } catch (error) {
+        reqLogger.error("Failed to list conversations", {
+          err: error instanceof Error ? error.message : String(error),
+        });
+        sendJson(res, 500, { error: "Failed to list conversations." });
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/conversations") {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      let body: unknown;
+      try {
+        body = await readJsonBody(req);
+      } catch {
+        sendJson(res, 400, { error: "Request body must be valid JSON." });
+        return;
+      }
+
+      const titleRaw =
+        typeof body === "object" && body !== null && "title" in body && typeof body.title === "string"
+          ? body.title.trim()
+          : "New Conversation";
+      const title = titleRaw.slice(0, 255) || "New Conversation";
+      const userId = user.id || user.email || "unknown";
+
+      try {
+        const conversation = await createConversation(userId, title);
+        sendJson(res, 201, { conversation });
+      } catch (error) {
+        reqLogger.error("Failed to create conversation", {
+          err: error instanceof Error ? error.message : String(error),
+        });
+        sendJson(res, 500, { error: "Failed to create conversation." });
+      }
+      return;
+    }
+
+    const conversationMessagesMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/messages$/);
+    if (req.method === "GET" && conversationMessagesMatch) {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      const conversationId = conversationMessagesMatch[1];
+      const userId = user.id || user.email || "unknown";
+
+      try {
+        const conv = await getConversationById(conversationId, userId);
+        if (!conv) {
+          sendJson(res, 404, { error: "Conversation not found." });
+          return;
+        }
+        const msgs = await getConversationMessages(conversationId);
+        sendJson(res, 200, { messages: msgs });
+      } catch (error) {
+        reqLogger.error("Failed to fetch conversation messages", {
+          err: error instanceof Error ? error.message : String(error),
+        });
+        sendJson(res, 500, { error: "Failed to fetch messages." });
+      }
+      return;
+    }
+
+    const conversationDetailMatch = pathname.match(/^\/api\/conversations\/([^/]+)$/);
+    if (conversationDetailMatch) {
+      const conversationId = conversationDetailMatch[1];
+
+      if (req.method === "GET") {
+        const user = await guardAuth(req, res);
+        if (!user) return;
+
+        const userId = user.id || user.email || "unknown";
+        try {
+          const conv = await getConversationById(conversationId, userId);
+          if (!conv) {
+            sendJson(res, 404, { error: "Conversation not found." });
+            return;
+          }
+          sendJson(res, 200, { conversation: conv });
+        } catch (error) {
+          reqLogger.error("Failed to fetch conversation", {
+            err: error instanceof Error ? error.message : String(error),
+          });
+          sendJson(res, 500, { error: "Failed to fetch conversation." });
+        }
+        return;
+      }
+
+      if (req.method === "DELETE") {
+        const user = await guardAuth(req, res);
+        if (!user) return;
+
+        const userId = user.id || user.email || "unknown";
+        try {
+          const deleted = await deleteConversation(conversationId, userId);
+          if (!deleted) {
+            sendJson(res, 404, { error: "Conversation not found." });
+            return;
+          }
+          sendJson(res, 200, { success: true });
+        } catch (error) {
+          reqLogger.error("Failed to delete conversation", {
+            err: error instanceof Error ? error.message : String(error),
+          });
+          sendJson(res, 500, { error: "Failed to delete conversation." });
+        }
+        return;
+      }
+    }
+
+    // 7. AI Test Endpoint
     if (req.method === "POST" && pathname === "/api/ai/test") {
       // Stricter rate limit for AI operations
       if (!applyRateLimit(req, res, aiRateLimiter)) {
@@ -199,6 +381,24 @@ export function createBackendServer(): http.Server {
         return;
       }
 
+      if (validation.conversationId) {
+        const userId = user.id || user.email || "unknown";
+        try {
+          const conv = await getConversationById(validation.conversationId, userId);
+          if (!conv) {
+            sendJson(res, 404, { error: "Conversation not found." });
+            return;
+          }
+          await addConversationMessage(validation.conversationId, "user", validation.prompt);
+        } catch (error) {
+          reqLogger.error("Failed to check conversation or persist user message", {
+            err: error instanceof Error ? error.message : String(error),
+          });
+          sendJson(res, 500, { error: "Failed to persist conversation message." });
+          return;
+        }
+      }
+
       if (!isArchestraConfigured()) {
         const errorMsg =
           "Archestra gateway is not fully configured (ARCHESTRA_VIRTUAL_KEY, ARCHESTRA_BASE_URL, or ARCHESTRA_MODEL missing).";
@@ -214,11 +414,24 @@ export function createBackendServer(): http.Server {
       try {
         const result = await runConnectionTest(validation.prompt);
         reqLogger.info("AI connection test completed successfully");
-        sendJson(res, 200, { result: result.text });
+
+        if (validation.conversationId) {
+          try {
+            await addConversationMessage(validation.conversationId, "assistant", result.text);
+          } catch (persistErr) {
+            reqLogger.warn("AI completed but failed to persist assistant message", {
+              err: persistErr instanceof Error ? persistErr.message : String(persistErr),
+            });
+          }
+        }
+
+        sendJson(res, 200, {
+          result: result.text,
+          ...(validation.conversationId ? { conversationId: validation.conversationId } : {}),
+        });
       } catch (error) {
         reqLogger.error("AI connection test failed.", {
           err: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
         });
         sendJson(res, 502, {
           error: "AI request failed. Check backend server logs for details.",

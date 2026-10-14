@@ -36,6 +36,28 @@ services:
       - keycloak-data:/opt/keycloak/data
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/ai-starter-realm.json:ro
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai-starter-postgres
+    restart: unless-stopped
+    labels:
+      logging: "promtail"
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-aistarter}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-aistarter_local_secret}"
+      POSTGRES_DB: "${POSTGRES_DB:-aistarter_db}"
+    volumes:
+      - app-postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aistarter} -d ${POSTGRES_DB:-aistarter_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   # Full containerized application services (activated with profile: full)
   backend:
     build:
@@ -59,6 +81,7 @@ services:
       AUTH_KEYCLOAK_ISSUER: "${AUTH_KEYCLOAK_ISSUER:-http://localhost:8080/realms/ai-starter}"
       AUTH_KEYCLOAK_INTERNAL_URL: "${AUTH_KEYCLOAK_INTERNAL_URL:-http://keycloak:8080/realms/ai-starter}"
       ARCHESTRA_BASE_URL: "${DOCKER_ARCHESTRA_BASE_URL:-http://archestra:9000/v1/openrouter}"
+      DATABASE_URL: "${DOCKER_DATABASE_URL:-postgresql://aistarter:aistarter_local_secret@postgres:5432/aistarter_db}"
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3001}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_FORMAT: "${LOG_FORMAT:-json}"
@@ -67,6 +90,8 @@ services:
         condition: service_started
       archestra:
         condition: service_started
+      postgres:
+        condition: service_healthy
       loki:
         condition: service_healthy
       promtail:
@@ -182,6 +207,8 @@ services:
 volumes:
   postgres-data:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-postgres-data
+  app-postgres-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-postgres-data
   app-data:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-app-data
   keycloak-data:

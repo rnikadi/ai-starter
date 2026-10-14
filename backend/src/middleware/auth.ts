@@ -96,9 +96,13 @@ export async function authenticateRequest(req: IncomingMessage): Promise<AuthCon
       const parsed = JSON.parse(forwardedRolesHeader) as unknown;
       if (Array.isArray(parsed)) {
         const roles = parsed.filter((r: unknown): r is string => typeof r === "string");
+        const idHeader = req.headers["x-user-id"];
+        const emailHeader = req.headers["x-user-email"];
         return {
           authenticated: true,
           user: {
+            id: typeof idHeader === "string" ? idHeader : undefined,
+            email: typeof emailHeader === "string" ? emailHeader : undefined,
             roles,
           },
         };

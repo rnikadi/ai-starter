@@ -46,10 +46,10 @@ function ensureDockerInfrastructure() {
     }
   }
 
-  log("Starting Keycloak and Archestra infrastructure (docker compose up -d)...");
+  log("Starting PostgreSQL, Keycloak, and Archestra infrastructure (docker compose up -d)...");
   try {
     execSync("docker compose up -d", { stdio: "inherit" });
-    log(`${GREEN}✓ Infrastructure containers are running.${RESET}\n`);
+    log(`${GREEN}✓ Supporting infrastructure containers are running.${RESET}\n`);
   } catch (err) {
     error("Failed to start Docker containers with docker compose up -d.");
     warn("Continuing to start frontend and backend anyway...\n");
@@ -67,8 +67,10 @@ function printDashboard() {
   console.log(`  ${BOLD}Health Probes:${RESET}         http://localhost:4000/healthz & /readyz`);
   console.log(`  ${BOLD}Keycloak Auth:${RESET}         http://localhost:8080 (Realm: ai-starter)`);
   console.log(`  ${BOLD}Archestra Gateway:${RESET}     http://localhost:9000 (UI: :3000)`);
+  console.log(`  ${BOLD}PostgreSQL (pgvector):${RESET} localhost:5432 (DB: aistarter_db)`);
   console.log(`${BOLD}====================================================${RESET}`);
-  console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop the frontend & backend dev servers.`);
+  console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop ONLY the frontend & backend dev servers.`);
+  console.log(`  (PostgreSQL, Keycloak, and Archestra will remain running for fast restart)`);
   console.log(`  To stop Docker containers later, run: ${CYAN}pnpm dev:down${RESET}`);
   console.log(`  To run full containerized demo with Grafana: ${CYAN}pnpm docker:demo${RESET}\n`);
 }

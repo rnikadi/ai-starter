@@ -7,6 +7,7 @@ const validMockEnv = {
   ARCHESTRA_VIRTUAL_KEY: "test-virtual-key",
   ARCHESTRA_MODEL: "test-model",
   FRONTEND_URL: "http://localhost:3001",
+  DATABASE_URL: "postgresql://aistarter:secret@localhost:5432/aistarter_db",
 };
 
 describe("Environment Validation", () => {
@@ -20,6 +21,7 @@ describe("Environment Validation", () => {
     expect(errorString).toContain("ARCHESTRA_VIRTUAL_KEY");
     expect(errorString).toContain("ARCHESTRA_MODEL");
     expect(errorString).toContain("FRONTEND_URL");
+    expect(errorString).toContain("DATABASE_URL");
   });
 
   it("passes validation with valid required variables and default ports", () => {
@@ -31,6 +33,9 @@ describe("Environment Validation", () => {
     expect(result.data?.ARCHESTRA_VIRTUAL_KEY).toBe("test-virtual-key");
     expect(result.data?.ARCHESTRA_MODEL).toBe("test-model");
     expect(result.data?.FRONTEND_URL).toBe("http://localhost:3001");
+    expect(result.data?.DATABASE_URL).toBe(
+      "postgresql://aistarter:secret@localhost:5432/aistarter_db",
+    );
   });
 
   it("fails validation for invalid URL format in issuer", () => {

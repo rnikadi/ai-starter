@@ -64,4 +64,30 @@ describe("validateAiTestRequest", () => {
       error: `The prompt must not exceed ${MAX_PROMPT_LENGTH} characters.`,
     });
   });
+
+  it("accepts an optional valid conversationId", () => {
+    expect(
+      validateAiTestRequest({
+        prompt: "Hello AI",
+        conversationId: "conv-1234",
+      }),
+    ).toEqual({
+      success: true,
+      prompt: "Hello AI",
+      conversationId: "conv-1234",
+    });
+  });
+
+  it("rejects an invalid conversationId type or empty string", () => {
+    expect(
+      validateAiTestRequest({
+        prompt: "Hello AI",
+        conversationId: "   ",
+      }),
+    ).toEqual({
+      success: false,
+      status: 400,
+      error: 'The "conversationId" field must be a non-empty string when provided.',
+    });
+  });
 });

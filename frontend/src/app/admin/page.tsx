@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { canAccessAdmin } from "@/lib/role-access";
 import { appConfig } from "@/lib/app-config";
-import { KeycloakSignOutButton } from "@/components/auth/keycloak-sign-out-button";
+import { UserAvatarDropdown } from "@/components/auth/user-avatar-dropdown";
+import { AdminConsole } from "@/app/admin/admin-console";
 
 async function AdminContent() {
   let session = null;
@@ -29,88 +30,31 @@ async function AdminContent() {
   }
 
   return (
-    <main className="workspace">
-      <header className="topbar">
-        <Link className="brand" href="/" aria-label="Go to dashboard">
-          <span className="brand-mark small">AI</span>
-          <span>{appConfig.displayName}</span>
-        </Link>
+    <div className="admin-page-container">
+      <header className="chatgpt-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link className="brand" href="/" aria-label="Go to dashboard">
+            <span className="brand-mark small">AI</span>
+            <span className="brand-title">{appConfig.displayName}</span>
+          </Link>
+          <span className="admin-tag-badge">Admin</span>
+        </div>
 
-        <div className="account-area">
-          <div className="account-details">
-            <span className="account-name">
-              {session.user.name ??
-                session.user.email ??
-                "Authenticated user"}
-            </span>
-            <span className="account-roles">{roles.join(" · ")}</span>
-          </div>
-          <KeycloakSignOutButton />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Link href="/" className="back-chat-link">
+            ← Back to Chat
+          </Link>
+          <UserAvatarDropdown
+            user={session.user}
+            roles={roles}
+            isAdmin={true}
+            isInAdminPage={true}
+          />
         </div>
       </header>
 
-      <section className="welcome-section">
-        <p className="eyebrow">WORKSPACE / ADMINISTRATION</p>
-        <h1>Admin console</h1>
-        <p className="muted">
-          Administrative access is restricted to users with the Keycloak
-          admin realm role.
-        </p>
-      </section>
-
-      <section className="status-grid" aria-label="Admin account status">
-        <article className="status-card">
-          <span className="status-dot" />
-          <div>
-            <p className="card-label">Identity</p>
-            <h2>Authenticated</h2>
-          </div>
-          <span className="card-detail">Keycloak / OIDC</span>
-        </article>
-
-        <article className="status-card">
-          <span className="status-dot" />
-          <div>
-            <p className="card-label">Authorization</p>
-            <h2>Administrator</h2>
-          </div>
-          <span className="card-detail">Admin role verified</span>
-        </article>
-
-        <article className="status-card">
-          <span className="status-dot neutral" />
-          <div>
-            <p className="card-label">Admin capabilities</p>
-            <h2>Initial phase</h2>
-          </div>
-          <span className="card-detail">Access verification only</span>
-        </article>
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">ADMINISTRATION</p>
-            <h2>Admin access is active</h2>
-          </div>
-          <span className="access-pill allowed">Authorized</span>
-        </div>
-
-        <p className="muted">
-          This initial version verifies administrator identity and access.
-          User management, role editing, and other administrative operations
-          have not been enabled.
-        </p>
-
-        <p>
-          <Link href="/">Return to workspace</Link>
-        </p>
-      </section>
-
-      <footer className="workspace-footer">
-        {appConfig.displayName} <span>·</span> Admin console
-      </footer>
-    </main>
+      <AdminConsole user={session.user} roles={roles} />
+    </div>
   );
 }
 

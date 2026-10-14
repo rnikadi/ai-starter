@@ -38,9 +38,15 @@ export async function POST(request: Request) {
     headers["Authorization"] = `Bearer ${session.accessToken}`;
   }
 
-  // Forward verified session roles to backend
+  // Forward verified session roles and user identity to backend
   if (Array.isArray(session.user.roles)) {
     headers["x-user-roles"] = JSON.stringify(session.user.roles);
+  }
+  if (session.user.id) {
+    headers["x-user-id"] = session.user.id;
+  }
+  if (session.user.email) {
+    headers["x-user-email"] = session.user.email;
   }
 
   try {

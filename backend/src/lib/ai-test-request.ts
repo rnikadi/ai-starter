@@ -4,6 +4,7 @@ export type AiTestRequestValidation =
   | {
       success: true;
       prompt: string;
+      conversationId?: string;
     }
   | {
       success: false;
@@ -27,6 +28,18 @@ export function validateAiTestRequest(
     };
   }
 
+  let conversationId: string | undefined;
+  if ("conversationId" in body && body.conversationId !== undefined && body.conversationId !== null) {
+    if (typeof body.conversationId !== "string" || !body.conversationId.trim()) {
+      return {
+        success: false,
+        status: 400,
+        error: 'The "conversationId" field must be a non-empty string when provided.',
+      };
+    }
+    conversationId = body.conversationId.trim();
+  }
+
   const prompt = body.prompt.trim();
 
   if (!prompt) {
@@ -48,5 +61,6 @@ export function validateAiTestRequest(
   return {
     success: true,
     prompt,
+    ...(conversationId ? { conversationId } : {}),
   };
 }

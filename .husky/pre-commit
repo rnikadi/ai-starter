@@ -1,0 +1,3 @@
+node scripts/scan-secrets.mjs
+pnpm lint-staged
+

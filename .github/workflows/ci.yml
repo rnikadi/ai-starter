@@ -42,3 +42,4 @@ jobs:
           ARCHESTRA_VIRTUAL_KEY: "ci-dummy-virtual-key"
           ARCHESTRA_MODEL: "ci-dummy-model"
           FRONTEND_URL: "http://localhost:3001"
+          DATABASE_URL: "postgresql://aistarter:secret@localhost:5432/aistarter_db"

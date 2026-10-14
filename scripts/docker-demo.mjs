@@ -55,8 +55,50 @@ function ensureEnvironment() {
   }
 }
 
-// 3. Launch Docker Compose full stack
-function startDockerCompose() {
+// 3. Stage 1: Launch PostgreSQL database as first priority
+function startPostgresFirst() {
+  const envFileArgs = fs.existsSync(".env.local")
+    ? "--env-file .env --env-file .env.local"
+    : "--env-file .env";
+
+  log("Stage 1/3: Starting PostgreSQL database container as first priority...");
+  try {
+    execSync(`docker compose ${envFileArgs} up -d postgres`, { stdio: "inherit" });
+  } catch {
+    error("Failed to start PostgreSQL container.");
+    process.exit(1);
+  }
+
+  process.stdout.write(`${CYAN}[docker-demo]${RESET} Waiting for PostgreSQL healthcheck (pg_isready)... `);
+  const maxRetries = 30;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      execSync("docker compose exec postgres pg_isready -U aistarter -d aistarter_db", {
+        stdio: "ignore",
+      });
+      console.log(`${GREEN}Healthy!${RESET}`);
+      return;
+    } catch {
+      // Waiting for postgres
+    }
+    execSync("sleep 1");
+  }
+  warn("PostgreSQL initialization took longer than expected, continuing with startup...");
+}
+
+// 4. Stage 2: Apply database migrations
+function applyDatabaseMigrations() {
+  log("Stage 2/3: Applying PostgreSQL migrations via Drizzle ORM...");
+  try {
+    execSync("pnpm db:migrate", { stdio: "inherit" });
+    success("Database schema verified and migrations applied.");
+  } catch {
+    warn("Database migration via local CLI skipped (will run inside backend container).");
+  }
+}
+
+// 5. Stage 3: Launch remaining supporting infrastructure and application containers
+function startRemainingStack() {
   const shouldBuild = !process.argv.includes("--no-build");
   const envFileArgs = fs.existsSync(".env.local")
     ? "--env-file .env --env-file .env.local"
@@ -65,14 +107,14 @@ function startDockerCompose() {
 
   log(
     shouldBuild
-      ? "Building and starting all demo containers (docker compose --profile full up -d --build)..."
-      : "Starting all demo containers (docker compose --profile full up -d)...",
+      ? "Stage 3/3: Building and starting application and supporting containers (docker compose --profile full up -d --build)..."
+      : "Stage 3/3: Starting application and supporting containers (docker compose --profile full up -d)...",
   );
 
   try {
     execSync(cmd, { stdio: "inherit" });
-    success("Containers launched via Docker Compose.");
-  } catch (err) {
+    success("All stack containers launched via Docker Compose.");
+  } catch {
     error("Failed to start Docker Compose full profile.");
     process.exit(1);
   }
@@ -142,6 +184,7 @@ function printDashboard() {
   console.log(`  ${BOLD}Health Probes:${RESET}         http://localhost:4000/healthz & /readyz`);
   console.log(`  ${BOLD}Keycloak Console:${RESET}      http://localhost:8080 (Realm: ai-starter)`);
   console.log(`  ${BOLD}Archestra Gateway:${RESET}     http://localhost:9000 (UI: http://localhost:3000)`);
+  console.log(`  ${BOLD}PostgreSQL (pgvector):${RESET} localhost:5432 (DB: aistarter_db, Drizzle ORM)`);
   console.log(`  ${BOLD}Grafana Observability:${RESET} http://localhost:3002 (Default login: admin / admin)`);
   console.log(`  ${BOLD}Loki Log Aggregator:${RESET}   http://localhost:3100`);
   console.log(`  ${BOLD}Prometheus Metrics:${RESET}    http://localhost:9090`);
@@ -153,6 +196,8 @@ function printDashboard() {
   console.log(`${BOLD}================================================================${RESET}`);
   console.log(`  ${BOLD}Quick Commands:${RESET}`);
   console.log(`    • View container status:   ${CYAN}pnpm docker:status${RESET}`);
+  console.log(`    • Stop ONLY app containers: ${CYAN}pnpm docker:demo:app:down${RESET} (keeps DB & infra running)`);
+  console.log(`    • Restart app containers:  ${CYAN}pnpm docker:demo:app:restart${RESET}`);
   console.log(`    • View service logs:       ${CYAN}docker compose --profile full logs -f [service]${RESET}`);
   console.log(`    • Stop all demo services:  ${CYAN}pnpm docker:down${RESET}`);
   console.log(`${BOLD}================================================================${RESET}\n`);
@@ -162,7 +207,15 @@ function printDashboard() {
 async function main() {
   checkDocker();
   ensureEnvironment();
-  startDockerCompose();
+
+  // Stage 1: Database first priority
+  startPostgresFirst();
+
+  // Stage 2: Database schema migrations
+  applyDatabaseMigrations();
+
+  // Stage 3: Supporting infrastructure & application stack
+  startRemainingStack();
 
   // Wait for Keycloak realm discovery endpoint to be ready before running bootstrap scripts
   await waitForHttp(

@@ -15,6 +15,7 @@ export function KeycloakSignOutButton() {
 
     try {
       await signOut({ redirect: false });
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/api/auth/keycloak-logout");
     } catch (error) {
       console.error("Unable to sign out.", error);
