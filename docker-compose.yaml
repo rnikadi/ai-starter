@@ -95,6 +95,7 @@ services:
   promtail:
     image: grafana/promtail:3.3.0
     container_name: ai-starter-promtail
+    user: "0:0"
     restart: unless-stopped
     profiles: ["full", "monitoring"]
     command: -config.file=/etc/promtail/config.yml
@@ -120,7 +121,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/ai-starter:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - loki
 
