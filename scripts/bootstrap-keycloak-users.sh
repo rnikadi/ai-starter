@@ -71,11 +71,13 @@ CLIENT_UUID="$(
     '
 )"
 
+FRONTEND_URL="${FRONTEND_URL:-http://localhost:3001}"
+
 docker exec keycloak "$KCADM" update "clients/${CLIENT_UUID}" \
   -r "$REALM" \
-  -s 'redirectUris=["http://localhost:3001/*","http://127.0.0.1:3001/*"]' \
-  -s 'webOrigins=["http://localhost:3001","http://127.0.0.1:3001","+"]' \
-  -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"http://localhost:3001/*##http://127.0.0.1:3001/*##+"}' \
+  -s "redirectUris=[\"${FRONTEND_URL}/*\",\"http://localhost:3001/*\",\"http://127.0.0.1:3001/*\"]" \
+  -s "webOrigins=[\"${FRONTEND_URL}\",\"http://localhost:3001\",\"http://127.0.0.1:3001\",\"+\"]" \
+  -s "attributes={\"pkce.code.challenge.method\":\"S256\",\"post.logout.redirect.uris\":\"${FRONTEND_URL}/*##http://localhost:3001/*##http://127.0.0.1:3001/*##+\"}" \
   >/dev/null
 
 CLIENT_JSON="$(

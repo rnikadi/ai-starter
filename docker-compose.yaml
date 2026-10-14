@@ -29,7 +29,7 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
-      KC_HOSTNAME: "http://localhost:8080"
+      KC_HOSTNAME: "${KC_HOSTNAME:-http://localhost:8080}"
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -54,13 +54,14 @@ services:
       - path: .env.local
         required: false
     environment:
-      BACKEND_PORT: "4000"
-      HOST: "0.0.0.0"
-      AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
-      AUTH_KEYCLOAK_INTERNAL_URL: "http://keycloak:8080/realms/ai-starter"
-      ARCHESTRA_INTERNAL_URL: "http://archestra:9000"
+      BACKEND_PORT: "${BACKEND_PORT:-4000}"
+      HOST: "${HOST:-0.0.0.0}"
+      AUTH_KEYCLOAK_ISSUER: "${AUTH_KEYCLOAK_ISSUER:-http://localhost:8080/realms/ai-starter}"
+      AUTH_KEYCLOAK_INTERNAL_URL: "${AUTH_KEYCLOAK_INTERNAL_URL:-http://keycloak:8080/realms/ai-starter}"
+      ARCHESTRA_BASE_URL: "${DOCKER_ARCHESTRA_BASE_URL:-http://archestra:9000/v1/openrouter}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3001}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
-      LOG_FORMAT: "json"
+      LOG_FORMAT: "${LOG_FORMAT:-json}"
     depends_on:
       keycloak:
         condition: service_started
@@ -88,14 +89,14 @@ services:
       - path: .env.local
         required: false
     environment:
-      PORT: "3001"
-      HOSTNAME: "0.0.0.0"
-      BACKEND_URL: "http://backend:4000"
-      NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
-      AUTH_URL: "http://localhost:3001"
-      AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
-      AUTH_KEYCLOAK_INTERNAL_URL: "http://keycloak:8080/realms/ai-starter"
-      LOG_FORMAT: "json"
+      PORT: "${PORT:-3001}"
+      HOSTNAME: "${HOSTNAME:-0.0.0.0}"
+      BACKEND_URL: "${DOCKER_BACKEND_URL:-http://backend:4000}"
+      NEXT_PUBLIC_BACKEND_URL: "${NEXT_PUBLIC_BACKEND_URL:-http://localhost:4000}"
+      AUTH_URL: "${AUTH_URL:-http://localhost:3001}"
+      AUTH_KEYCLOAK_ISSUER: "${AUTH_KEYCLOAK_ISSUER:-http://localhost:8080/realms/ai-starter}"
+      AUTH_KEYCLOAK_INTERNAL_URL: "${AUTH_KEYCLOAK_INTERNAL_URL:-http://keycloak:8080/realms/ai-starter}"
+      LOG_FORMAT: "${LOG_FORMAT:-json}"
     depends_on:
       backend:
         condition: service_started

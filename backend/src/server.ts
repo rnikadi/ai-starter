@@ -4,20 +4,54 @@ import { applyRateLimit, aiRateLimiter, apiRateLimiter } from "./middleware/rate
 import { validateAiTestRequest } from "./lib/ai-test-request.js";
 import {
   isArchestraConfigured,
-  isMockAiEnabled,
   runConnectionTest,
 } from "./mastra/agents/connection-test-agent.js";
+import { getBackendEnv } from "./config/env.js";
 import { getLivenessReport, getReadinessReport } from "./lib/health.js";
 import { openapiSpec, renderDocsHtml } from "./docs/openapi.js";
 import { logger, generateRequestId, type Logger } from "./lib/logger.js";
 
-function setCorsHeaders(res: ServerResponse, origin?: string): void {
-  const allowedOrigin =
-    origin && (origin.includes("localhost:3001") || origin.includes("127.0.0.1:3001"))
-      ? origin
-      : "http://localhost:3001";
+function getAllowedOrigins(): string[] {
+  const env = getBackendEnv();
+  const configured = [
+    env.FRONTEND_URL,
+    env.CORS_ALLOWED_ORIGINS?.split(",").map((s) => s.trim()),
+  ]
+    .flat()
+    .filter((v): v is string => Boolean(v && v.trim().length > 0));
 
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  return Array.from(new Set(configured));
+}
+
+function setCorsHeaders(res: ServerResponse, origin?: string): void {
+  const allowed = getAllowedOrigins();
+  let selectedOrigin = allowed[0] || "";
+
+  if (origin) {
+    if (allowed.includes(origin) || allowed.includes("*")) {
+      selectedOrigin = origin;
+    } else {
+      try {
+        const reqOrigin = new URL(origin).origin;
+        const matched = allowed.find((allowedItem) => {
+          try {
+            return new URL(allowedItem).origin === reqOrigin;
+          } catch {
+            return false;
+          }
+        });
+        if (matched) {
+          selectedOrigin = origin;
+        }
+      } catch {
+        // Fall back to primary origin
+      }
+    }
+  }
+
+  if (selectedOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", selectedOrigin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
@@ -67,8 +101,7 @@ export function createBackendServer(): http.Server {
 
     res.setHeader("x-request-id", reqId);
 
-    const parsedUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    const pathname = parsedUrl.pathname;
+    const pathname = (req.url ?? "/").split("?")[0] || "/";
     const reqLogger: Logger = logger.child({ reqId, method: req.method, path: pathname });
 
     // Handle preflight
@@ -166,14 +199,11 @@ export function createBackendServer(): http.Server {
         return;
       }
 
-      if (!isMockAiEnabled() && !isArchestraConfigured()) {
+      if (!isArchestraConfigured()) {
         const errorMsg =
-          "Archestra gateway is not fully configured in .env.local (ARCHESTRA_VIRTUAL_KEY, ARCHESTRA_BASE_URL, or ARCHESTRA_MODEL is missing). Set MOCK_AI=true to test offline.";
+          "Archestra gateway is not fully configured (ARCHESTRA_VIRTUAL_KEY, ARCHESTRA_BASE_URL, or ARCHESTRA_MODEL missing).";
         reqLogger.error("Archestra gateway configuration missing or incomplete", {
           error: errorMsg,
-          hasVirtualKey: Boolean(process.env.ARCHESTRA_VIRTUAL_KEY?.trim()),
-          hasBaseUrl: Boolean(process.env.ARCHESTRA_BASE_URL?.trim()),
-          hasModel: Boolean(process.env.ARCHESTRA_MODEL?.trim()),
         });
         sendJson(res, 500, {
           error: errorMsg,
@@ -183,10 +213,8 @@ export function createBackendServer(): http.Server {
 
       try {
         const result = await runConnectionTest(validation.prompt);
-        reqLogger.info("AI connection test completed successfully", {
-          mocked: result.mocked,
-        });
-        sendJson(res, 200, { result: result.text, mocked: result.mocked });
+        reqLogger.info("AI connection test completed successfully");
+        sendJson(res, 200, { result: result.text });
       } catch (error) {
         reqLogger.error("AI connection test failed.", {
           err: error instanceof Error ? error.message : String(error),

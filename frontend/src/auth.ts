@@ -3,6 +3,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
+import { getFrontendEnv } from "@/lib/env";
 
 const envPath = fs.existsSync(".env.local")
   ? path.resolve(".env.local")
@@ -50,14 +51,12 @@ function extractIdTokenRoles(idToken: string | undefined): string[] {
   }
 }
 
-const keycloakIssuer =
-  process.env.AUTH_KEYCLOAK_ISSUER ||
-  "http://localhost:8080/realms/ai-starter";
-
-const internalKeycloakUrl = process.env.AUTH_KEYCLOAK_INTERNAL_URL;
+const env = getFrontendEnv();
+const keycloakIssuer = env.AUTH_KEYCLOAK_ISSUER;
+const internalKeycloakUrl = env.AUTH_KEYCLOAK_INTERNAL_URL;
 
 // When running inside Docker Compose, route server-to-server requests to internal Docker DNS
-// while keeping the public issuer (http://localhost:8080/...) for browser redirects and token validation
+// while keeping the public issuer for browser redirects and token validation
 if (typeof globalThis.fetch === "function" && internalKeycloakUrl) {
   const originalFetch = globalThis.fetch;
   const publicOrigin = new URL(keycloakIssuer).origin;
@@ -87,15 +86,12 @@ if (typeof globalThis.fetch === "function" && internalKeycloakUrl) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret:
-    process.env.AUTH_SECRET ||
-    "ai-starter-local-auth-secret-do-not-use-in-production-min32chars",
+  secret: env.AUTH_SECRET,
 
   providers: [
     Keycloak({
-      clientId: process.env.AUTH_KEYCLOAK_ID || "ai-starter-web",
-      clientSecret:
-        process.env.AUTH_KEYCLOAK_SECRET || "ai-starter-kit-local-client-secret",
+      clientId: env.AUTH_KEYCLOAK_ID,
+      clientSecret: env.AUTH_KEYCLOAK_SECRET,
       issuer: keycloakIssuer,
     }),
   ],

@@ -24,7 +24,6 @@
     "build": "cd frontend && next build --webpack",
     "lint": "cd frontend && eslint",
     "test": "vitest run",
-    "test:archestra": "node --env-file=.env.local --experimental-strip-types backend/scripts/test-archestra.ts",
     "typecheck": "tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p backend/tsconfig.json",
     "check": "pnpm test && pnpm typecheck && pnpm lint && pnpm build"
   },

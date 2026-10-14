@@ -1,9 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createBackendServer } from "./server.js";
-
 import { Readable } from "node:stream";
+
+vi.mock("./mastra/agents/connection-test-agent.js", () => ({
+  isArchestraConfigured: () => true,
+  runConnectionTest: async (prompt: string) => ({
+    text: `Connection test successful for: ${prompt}`,
+  }),
+}));
 
 interface MockResponse {
   statusCode: number;
@@ -82,7 +88,6 @@ function executeRequest(
       },
     }) as unknown as ServerResponse & { body: string; statusCode: number };
 
-    // Obtain the request listener from createBackendServer
     const listeners = server.listeners("request") as ((
       req: IncomingMessage,
       res: ServerResponse,
@@ -100,15 +105,15 @@ function executeRequest(
 }
 
 describe("Backend Server Endpoints", () => {
-  const server = createBackendServer();
-
   beforeAll(() => {
-    process.env.MOCK_AI = "true";
+    process.env.AUTH_KEYCLOAK_ISSUER = "http://localhost:8080/realms/ai-starter";
+    process.env.ARCHESTRA_BASE_URL = "http://localhost:9000/v1/openrouter";
+    process.env.ARCHESTRA_VIRTUAL_KEY = "test-virtual-key";
+    process.env.ARCHESTRA_MODEL = "test-model";
+    process.env.FRONTEND_URL = "http://localhost:3001";
   });
 
-  afterAll(() => {
-    delete process.env.MOCK_AI;
-  });
+  const server = createBackendServer();
 
   it("serves liveness probe on /healthz", async () => {
     const res = await executeRequest(server, { url: "/healthz" });
@@ -199,7 +204,7 @@ describe("Backend Server Endpoints", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("executes mock AI in /api/ai/test when MOCK_AI=true with developer role", async () => {
+  it("executes AI test in /api/ai/test with developer role", async () => {
     const res = await executeRequest(server, {
       method: "POST",
       url: "/api/ai/test",
@@ -211,9 +216,8 @@ describe("Backend Server Endpoints", () => {
     });
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body) as Record<string, unknown>;
-    expect(json.mocked).toBe(true);
-    expect(json.result).toContain("[MOCK AI MODE]");
-    expect(json.result).toContain("Echo test");
+    expect(json.mocked).toBeUndefined();
+    expect(json.result).toContain("Connection test successful for: Echo test");
   });
 
   it("returns 404 for unknown routes", async () => {

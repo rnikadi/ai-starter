@@ -4,18 +4,17 @@ export const backendEnvSchema = z.object({
   BACKEND_PORT: z.coerce.number().default(4000),
   PORT: z.coerce.number().optional(),
   HOST: z.string().default("0.0.0.0"),
-  AUTH_KEYCLOAK_ISSUER: z.string().url().default("http://localhost:8080/realms/ai-starter"),
+  AUTH_KEYCLOAK_ISSUER: z.string().url("AUTH_KEYCLOAK_ISSUER must be a valid URL"),
   AUTH_KEYCLOAK_INTERNAL_URL: z.string().url().optional(),
   AUTH_KEYCLOAK_ID: z.string().default("ai-starter-web"),
   AUTH_KEYCLOAK_SECRET: z.string().optional(),
-  ARCHESTRA_BASE_URL: z.string().url().default("http://localhost:9000/v1"),
-  ARCHESTRA_INTERNAL_URL: z.string().url().optional(),
-  ARCHESTRA_VIRTUAL_KEY: z.string().optional(),
-  ARCHESTRA_MODEL: z.string().optional(),
-  MOCK_AI: z
-    .enum(["true", "false", "1", "0"])
-    .optional()
-    .transform((val) => val === "true" || val === "1"),
+  ARCHESTRA_BASE_URL: z.string().url("ARCHESTRA_BASE_URL must be a valid URL"),
+  ARCHESTRA_VIRTUAL_KEY: z.string().min(1, "ARCHESTRA_VIRTUAL_KEY is required"),
+  ARCHESTRA_MODEL: z.string().min(1, "ARCHESTRA_MODEL is required"),
+  FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
+  BACKEND_URL: z.string().url().optional(),
+  BACKEND_PUBLIC_URL: z.string().url().optional(),
+  CORS_ALLOWED_ORIGINS: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   LOG_FORMAT: z.enum(["pretty", "json"]).optional(),
   NODE_ENV: z.string().default("development"),
@@ -24,6 +23,10 @@ export const backendEnvSchema = z.object({
 export type BackendEnv = z.infer<typeof backendEnvSchema>;
 
 let cachedEnv: BackendEnv | null = null;
+
+export function resetCachedBackendEnv(): void {
+  cachedEnv = null;
+}
 
 export function validateBackendEnv(
   source: Record<string, unknown> = process.env,
@@ -48,14 +51,11 @@ export function getBackendEnv(): BackendEnv {
   const { valid, errors, data } = validateBackendEnv(process.env);
   if (!valid || !data) {
     const errorList = errors ? errors.join("\n  - ") : "Unknown validation failure";
-    const msg = `\n[FATAL] Environment variable validation failed:\n  - ${errorList}\nPlease review your .env.local file or run ./setupscripts.sh\n`;
+    const msg = `[FATAL] Environment variable validation failed:\n  - ${errorList}\nPlease review your environment configuration or .env.local file.`;
     console.error(msg);
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Invalid environment configuration.");
-    }
+    throw new Error(msg);
   }
 
-  cachedEnv = data || (backendEnvSchema.parse({}) as BackendEnv);
+  cachedEnv = data;
   return cachedEnv;
 }
-

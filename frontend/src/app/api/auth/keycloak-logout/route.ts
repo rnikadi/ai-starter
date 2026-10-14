@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
+import { getFrontendEnv } from "@/lib/env";
 
-async function handleKeycloakLogout(request: Request) {
-  const issuer = process.env.AUTH_KEYCLOAK_ISSUER;
-  const clientId = process.env.AUTH_KEYCLOAK_ID;
-
-  if (!issuer || !clientId) {
-    console.error("Keycloak logout configuration is missing.");
-
+async function handleKeycloakLogout() {
+  let env;
+  try {
+    env = getFrontendEnv();
+  } catch (err) {
+    console.error("Keycloak logout configuration is missing:", err);
     return NextResponse.json(
       { error: "Keycloak logout is not configured." },
       { status: 500 },
     );
   }
 
-  let issuerUrl: URL;
+  const issuer = env.AUTH_KEYCLOAK_ISSUER;
+  const clientId = env.AUTH_KEYCLOAK_ID;
+  const authUrl = env.AUTH_URL;
 
+  let issuerUrl: URL;
   try {
     issuerUrl = new URL(issuer);
   } catch {
@@ -24,10 +27,7 @@ async function handleKeycloakLogout(request: Request) {
     );
   }
 
-  if (
-    issuerUrl.protocol !== "http:" &&
-    issuerUrl.protocol !== "https:"
-  ) {
+  if (issuerUrl.protocol !== "http:" && issuerUrl.protocol !== "https:") {
     return NextResponse.json(
       { error: "The Keycloak issuer must use HTTP or HTTPS." },
       { status: 500 },
@@ -39,19 +39,7 @@ async function handleKeycloakLogout(request: Request) {
     issuerUrl.origin,
   );
 
-  const authUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL;
-  let returnUrl: URL;
-
-  if (authUrl) {
-    returnUrl = new URL("/", authUrl);
-  } else {
-    returnUrl = new URL("/", request.url);
-  }
-
-  // Normalize 0.0.0.0 bind address to localhost so Keycloak receives an allowed redirect URI
-  if (returnUrl.hostname === "0.0.0.0") {
-    returnUrl.hostname = "localhost";
-  }
+  const returnUrl = new URL("/", authUrl);
 
   logoutUrl.searchParams.set("client_id", clientId);
   logoutUrl.searchParams.set(
@@ -62,10 +50,10 @@ async function handleKeycloakLogout(request: Request) {
   return NextResponse.redirect(logoutUrl, 303);
 }
 
-export async function GET(request: Request) {
-  return handleKeycloakLogout(request);
+export async function GET() {
+  return handleKeycloakLogout();
 }
 
-export async function POST(request: Request) {
-  return handleKeycloakLogout(request);
+export async function POST() {
+  return handleKeycloakLogout();
 }

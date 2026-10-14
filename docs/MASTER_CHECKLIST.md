@@ -349,7 +349,7 @@ before assuming that every exported setting has been applied.
 
 -   [x] Implement OpenAPI 3.1 specification (`/openapi.json`) and offline documentation (`/docs`).
 
--   [x] Implement offline mock AI mode (`MOCK_AI=true`).
+-   [x] Enforce production-grade strict environment validation without hardcoded fallback URLs.
 
 -   [x] Configure production multi-stage Dockerfiles for frontend and backend.
 

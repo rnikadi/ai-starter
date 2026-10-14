@@ -16,18 +16,18 @@ const port = env.PORT || env.BACKEND_PORT;
 const host = env.HOST;
 
 const server = createBackendServer();
+const publicUrl =
+  env.BACKEND_PUBLIC_URL ||
+  `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
 
 server.listen(port, host, () => {
   console.log(`\n========================================`);
   console.log(`  AI Starter Backend API Server`);
-  console.log(`  Listening at:     http://localhost:${port}`);
-  console.log(`  API Docs:         http://localhost:${port}/docs`);
-  console.log(`  OpenAPI Spec:     http://localhost:${port}/openapi.json`);
-  console.log(`  Liveness Probe:   http://localhost:${port}/healthz`);
-  console.log(`  Readiness Probe:  http://localhost:${port}/readyz`);
-  if (env.MOCK_AI) {
-    console.log(`  Mode:             OFFLINE MOCK AI (MOCK_AI=true)`);
-  }
+  console.log(`  Listening at:     ${publicUrl}`);
+  console.log(`  API Docs:         ${publicUrl}/docs`);
+  console.log(`  OpenAPI Spec:     ${publicUrl}/openapi.json`);
+  console.log(`  Liveness Probe:   ${publicUrl}/healthz`);
+  console.log(`  Readiness Probe:  ${publicUrl}/readyz`);
   console.log(`========================================\n`);
 });
 
@@ -35,4 +35,3 @@ process.on("SIGTERM", () => {
   console.log("Shutting down backend server...");
   server.close();
 });
-

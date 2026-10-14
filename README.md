@@ -515,11 +515,7 @@ AI Starter provides production-grade backend plumbing designed to remain generic
 - **`GET /openapi.json`**: Complete, machine-readable OpenAPI 3.1 specification.
 - **`GET /docs`**: Interactive, dark-mode API documentation viewer. Self-contained with zero external CDN dependencies—works 100% offline.
 
-### 7. Offline mock AI mode (`MOCK_AI=true`)
-- Set `MOCK_AI=true` in `.env.local` to develop and test without running Archestra or requiring external OpenRouter API keys.
-- Returns instant simulated agent responses marked with `[MOCK AI MODE]`.
-
-### 8. Automated CI workflow
+### 7. Automated CI workflow
 - `.github/workflows/ci.yml` runs automated tests, typechecks, linting, and production builds on push and pull requests.
 
 ## Observability and Grafana logging

@@ -8,8 +8,8 @@ export const openapiSpec = {
   },
   servers: [
     {
-      url: "http://localhost:4000",
-      description: "Local development server",
+      url: process.env.BACKEND_PUBLIC_URL || process.env.BACKEND_URL || "/",
+      description: process.env.NODE_ENV === "production" ? "Production API server" : "API server",
     },
   ],
   paths: {
@@ -175,7 +175,6 @@ export const openapiSpec = {
                   status: { type: "string", example: "up" },
                   latencyMs: { type: "number", example: 8 },
                   url: { type: "string" },
-                  mocked: { type: "boolean" },
                 },
               },
             },
@@ -200,7 +199,6 @@ export const openapiSpec = {
             type: "string",
             example: "AI connection confirmed successfully.",
           },
-          mocked: { type: "boolean", example: false },
         },
       },
       ErrorResponse: {
@@ -390,7 +388,7 @@ export function renderDocsHtml(): string {
         <span class="tag">Readiness</span>
       </div>
       <div class="endpoint-body">
-        <p class="desc">Dependency readiness check for Keycloak OIDC (:8080) and Archestra LLM Gateway (:9000).</p>
+        <p class="desc">Dependency readiness check for Keycloak OIDC and Archestra LLM Gateway.</p>
         <div class="section-title" style="margin-top: 1rem;">Example Response (200 OK)</div>
         <pre><code>{
   "status": "ready",
@@ -423,15 +421,14 @@ export function renderDocsHtml(): string {
         <span class="tag">Role: developer | admin</span>
       </div>
       <div class="endpoint-body">
-        <p class="desc">Executes Mastra Agent against Archestra gateway (or simulated in mock mode). Rate limited to 20 req/min.</p>
+        <p class="desc">Executes Mastra Agent against Archestra gateway. Rate limited to 20 req/min.</p>
         <div class="section-title" style="margin-top: 1rem;">Request Body (JSON)</div>
         <pre><code>{
   "prompt": "Say hello and confirm AI connectivity"
 }</code></pre>
         <div class="section-title" style="margin-top: 1rem;">Response (200 OK)</div>
         <pre><code>{
-  "result": "AI connection confirmed successfully.",
-  "mocked": false
+  "result": "AI connection confirmed successfully."
 }</code></pre>
       </div>
     </div>
@@ -439,4 +436,3 @@ export function renderDocsHtml(): string {
 </body>
 </html>`;
 }
-

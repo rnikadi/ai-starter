@@ -1,9 +1,5 @@
 import process from "node:process";
-import {
-  getArchestraBaseUrl,
-  isArchestraConfigured,
-  isMockAiEnabled,
-} from "../mastra/agents/connection-test-agent.js";
+import { isArchestraConfigured } from "../mastra/agents/connection-test-agent.js";
 import { getBackendEnv } from "../config/env.js";
 
 export interface LivenessReport {
@@ -22,7 +18,6 @@ export interface DependencyCheck {
   status: "up" | "down";
   latencyMs: number;
   url?: string;
-  mocked?: boolean;
   error?: string;
 }
 
@@ -80,41 +75,32 @@ export async function checkKeycloakReadiness(issuerUrl: string): Promise<Depende
 }
 
 export async function checkArchestraReadiness(baseUrl: string): Promise<DependencyCheck> {
-  if (isMockAiEnabled()) {
-    return {
-      status: "up",
-      latencyMs: 0,
-      url: baseUrl,
-      mocked: true,
-    };
-  }
-
   if (!isArchestraConfigured()) {
     return {
       status: "down",
       latencyMs: 0,
       url: baseUrl,
-      error: "Archestra environment variables not configured in .env.local",
+      error: "Archestra environment variables not configured (ARCHESTRA_BASE_URL, ARCHESTRA_VIRTUAL_KEY, or ARCHESTRA_MODEL missing)",
     };
   }
 
+  const env = getBackendEnv();
   const start = performance.now();
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
-    // Archestra is OpenAI-compatible, baseUrl is typically http://localhost:9000/v1
     const testUrl = `${baseUrl.replace(/\/+$/, "")}/models`;
     const res = await fetch(testUrl, {
       signal: controller.signal,
       headers: {
-        Authorization: `Bearer ${process.env.ARCHESTRA_VIRTUAL_KEY || ""}`,
+        Authorization: `Bearer ${env.ARCHESTRA_VIRTUAL_KEY}`,
       },
     });
     clearTimeout(timeout);
 
     const latencyMs = Math.round(performance.now() - start);
     if (res.ok || res.status === 401) {
-      // 401 means Archestra is alive and processing auth headers
+      // 401 means Archestra gateway is reachable and enforcing authentication
       return { status: "up", latencyMs, url: testUrl };
     }
 
@@ -139,8 +125,8 @@ export async function getReadinessReport(): Promise<{
   report: ReadinessReport;
 }> {
   const env = getBackendEnv();
-  const keycloakUrl = process.env.AUTH_KEYCLOAK_INTERNAL_URL || env.AUTH_KEYCLOAK_ISSUER;
-  const archestraUrl = getArchestraBaseUrl();
+  const keycloakUrl = env.AUTH_KEYCLOAK_INTERNAL_URL || env.AUTH_KEYCLOAK_ISSUER;
+  const archestraUrl = env.ARCHESTRA_BASE_URL;
   const [keycloak, archestra] = await Promise.all([
     checkKeycloakReadiness(keycloakUrl),
     checkArchestraReadiness(archestraUrl),
@@ -160,4 +146,3 @@ export async function getReadinessReport(): Promise<{
     },
   };
 }
-

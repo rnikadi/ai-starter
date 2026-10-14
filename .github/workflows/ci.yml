@@ -32,6 +32,13 @@ jobs:
       - name: Run verification suite (test, typecheck, lint, build)
         run: pnpm check
         env:
-          MOCK_AI: "true"
           AUTH_SECRET: "ci-dummy-secret-minimum-32-characters-long"
-
+          AUTH_URL: "http://localhost:3001"
+          AUTH_KEYCLOAK_ID: "ai-starter-web"
+          AUTH_KEYCLOAK_SECRET: "ci-dummy-keycloak-secret"
+          AUTH_KEYCLOAK_ISSUER: "http://localhost:8080/realms/ai-starter"
+          BACKEND_URL: "http://localhost:4000"
+          ARCHESTRA_BASE_URL: "http://localhost:9000/v1/openrouter"
+          ARCHESTRA_VIRTUAL_KEY: "ci-dummy-virtual-key"
+          ARCHESTRA_MODEL: "ci-dummy-model"
+          FRONTEND_URL: "http://localhost:3001"
