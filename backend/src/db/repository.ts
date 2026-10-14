@@ -110,6 +110,22 @@ export async function deleteConversation(conversationId: string, userId: string)
   });
 }
 
+export async function updateConversationTitle(conversationId: string, userId: string, title: string) {
+  return traceAsync("db.updateConversationTitle", async (span) => {
+    span.setAttribute("db.system", "postgresql");
+    span.setAttribute("db.operation", "UPDATE");
+    span.setAttribute("conversation.id", conversationId);
+    span.setAttribute("user.id", userId);
+    const db = getDb();
+    const [updated] = await db
+      .update(conversations)
+      .set({ title, updatedAt: new Date() })
+      .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+      .returning();
+    return updated || null;
+  });
+}
+
 export async function getDatabaseStats() {
   return traceAsync("db.getDatabaseStats", async (span) => {
     span.setAttribute("db.system", "postgresql");

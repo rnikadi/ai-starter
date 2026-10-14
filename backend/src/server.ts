@@ -18,6 +18,7 @@ import {
   getConversationMessages,
   addConversationMessage,
   deleteConversation,
+  updateConversationTitle,
   getDatabaseStats,
   clearAllConversations,
 } from "./db/repository.js";
@@ -503,6 +504,45 @@ export function createBackendServer(): http.Server {
             err: error instanceof Error ? error.message : String(error),
           });
           sendJson(res, 500, { error: "Failed to fetch conversation." });
+        }
+        return;
+      }
+
+      if (req.method === "PATCH") {
+        const user = await guardAuth(req, res);
+        if (!user) return;
+
+        let body: unknown;
+        try {
+          body = await readJsonBody(req);
+        } catch (err) {
+          if (err instanceof PayloadTooLargeError) {
+            sendJson(res, 413, { error: err.message });
+            return;
+          }
+          sendJson(res, 400, { error: "Request body must be valid JSON." });
+          return;
+        }
+
+        const parsed = createConversationSchema.safeParse(body);
+        if (!parsed.success) {
+          sendJson(res, 400, { error: parsed.error.issues[0]?.message ?? "Invalid title." });
+          return;
+        }
+
+        const userId = user.id || user.email || "unknown";
+        try {
+          const updated = await updateConversationTitle(conversationId, userId, parsed.data.title);
+          if (!updated) {
+            sendJson(res, 404, { error: "Conversation not found." });
+            return;
+          }
+          sendJson(res, 200, { conversation: updated });
+        } catch (error) {
+          reqLogger.error("Failed to update conversation title", {
+            err: error instanceof Error ? error.message : String(error),
+          });
+          sendJson(res, 500, { error: "Failed to update conversation." });
         }
         return;
       }

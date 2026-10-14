@@ -8,12 +8,17 @@ interface AdminConsoleProps {
     email?: string | null;
   };
   roles?: string[];
+  initialTab?: AdminTab;
 }
 
 type AdminTab = "overview" | "database" | "users" | "consoles" | "settings";
 
-export function AdminConsole({ user, roles = [] }: AdminConsoleProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+export function AdminConsole({
+  user,
+  roles = [],
+  initialTab = "overview",
+}: AdminConsoleProps) {
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -276,6 +281,17 @@ export function AdminConsole({ user, roles = [] }: AdminConsoleProps) {
                 </a>
 
                 <a
+                  href="http://localhost:3002/explore?schemaVersion=1&panes=%7B%22loki%22:%7B%22datasource%22:%22loki%22%7D%7D"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="admin-link-card"
+                >
+                  <span className="admin-link-title">Loki Log Aggregation</span>
+                  <span className="admin-link-desc">Query structured service logs, Promtail streams, and LogQL filters in Grafana.</span>
+                  <span className="admin-link-url">localhost:3002 (Loki) ↗</span>
+                </a>
+
+                <a
                   href="http://localhost:3002/explore?schemaVersion=1&panes=%7B%22tempo%22:%7B%22datasource%22:%22tempo%22%7D%7D"
                   target="_blank"
                   rel="noreferrer"
@@ -326,6 +342,10 @@ export function AdminConsole({ user, roles = [] }: AdminConsoleProps) {
                 <div className="admin-info-row">
                   <span className="admin-info-key">Database</span>
                   <span className="admin-info-val">PostgreSQL 16 with pgvector & Drizzle ORM</span>
+                </div>
+                <div className="admin-info-row">
+                  <span className="admin-info-key">Observability</span>
+                  <span className="admin-info-val">Grafana, Prometheus, Loki & Tempo (OpenTelemetry)</span>
                 </div>
               </div>
             </div>

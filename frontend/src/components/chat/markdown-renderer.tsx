@@ -22,8 +22,9 @@ function renderInline(text: string): React.ReactNode[] {
   // 3. Bold: **text** or __text__
   // 4. Italic: *text* or _text_
   // 5. Link: [label](url)
+  // 6. Hard break: \r?\n
   const inlineRegex =
-    /(`([^`]+)`)|(\*\*\*([^*]+)\*\*\*|___([^_]+)___)|(\*\*([^*]+)\*\*|__([^_]+)__)|(\*([^*]+)\*|_([^_]+)_)|(\[([^\]]+)\]\(([^)]+)\))/;
+    /(`([^`]+)`)|(\*\*\*([^*]+)\*\*\*|___([^_]+)___)|(\*\*([^*]+)\*\*|__([^_]+)__)|(\*([^*]+)\*|_([^_]+)_)|(\[([^\]]+)\]\(([^)]+)\))|(\r?\n)/;
 
   while (remaining.length > 0) {
     const match = remaining.match(inlineRegex);
@@ -45,7 +46,7 @@ function renderInline(text: string): React.ReactNode[] {
     if (match[1]) {
       const codeContent = match[2];
       nodes.push(
-        <code key={`code-${keyIdx++}`} className="chatgpt-inline-code">
+        <code key={`code-${keyIdx++}`} className="markdown-inline-code">
           {codeContent}
         </code>,
       );
@@ -96,11 +97,17 @@ function renderInline(text: string): React.ReactNode[] {
           href={isSafe ? href : "#"}
           target="_blank"
           rel="noopener noreferrer"
-          className="chatgpt-link"
+          className="markdown-link"
         >
           {label}
         </a>,
       );
+      continue;
+    }
+
+    // 6. Hard break: \r?\n
+    if (match[15]) {
+      nodes.push(<br key={`br-${keyIdx++}`} />);
       continue;
     }
   }
@@ -252,7 +259,7 @@ function parseMarkdownBlocks(raw: string): Block[] {
     if (paraLines.length > 0) {
       blocks.push({
         type: "paragraph",
-        text: paraLines.join(" "),
+        text: paraLines.join("\n"),
       });
     }
   }
@@ -282,49 +289,49 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
   }
 
   return (
-    <div className={`chatgpt-markdown-body ${className}`.trim()}>
+    <div className={`markdown-body ${className}`.trim()}>
       {blocks.map((block, idx) => {
         switch (block.type) {
           case "heading": {
             const inlineNodes = renderInline(block.text);
             switch (block.level) {
               case 1:
-                return <h1 key={idx} className="chatgpt-h1">{inlineNodes}</h1>;
+                return <h1 key={idx} className="markdown-h1">{inlineNodes}</h1>;
               case 2:
-                return <h2 key={idx} className="chatgpt-h2">{inlineNodes}</h2>;
+                return <h2 key={idx} className="markdown-h2">{inlineNodes}</h2>;
               case 3:
-                return <h3 key={idx} className="chatgpt-h3">{inlineNodes}</h3>;
+                return <h3 key={idx} className="markdown-h3">{inlineNodes}</h3>;
               case 4:
-                return <h4 key={idx} className="chatgpt-h4">{inlineNodes}</h4>;
+                return <h4 key={idx} className="markdown-h4">{inlineNodes}</h4>;
               case 5:
-                return <h5 key={idx} className="chatgpt-h5">{inlineNodes}</h5>;
+                return <h5 key={idx} className="markdown-h5">{inlineNodes}</h5>;
               default:
-                return <h6 key={idx} className="chatgpt-h6">{inlineNodes}</h6>;
+                return <h6 key={idx} className="markdown-h6">{inlineNodes}</h6>;
             }
           }
 
           case "paragraph":
             return (
-              <p key={idx} className="chatgpt-paragraph">
+              <p key={idx} className="markdown-paragraph">
                 {renderInline(block.text)}
               </p>
             );
 
           case "hr":
-            return <hr key={idx} className="chatgpt-hr" />;
+            return <hr key={idx} className="markdown-hr" />;
 
           case "blockquote":
             return (
-              <blockquote key={idx} className="chatgpt-blockquote">
+              <blockquote key={idx} className="markdown-blockquote">
                 {renderInline(block.text)}
               </blockquote>
             );
 
           case "ul":
             return (
-              <ul key={idx} className="chatgpt-ul">
+              <ul key={idx} className="markdown-ul">
                 {block.items.map((item, itemIdx) => (
-                  <li key={itemIdx} className="chatgpt-li">
+                  <li key={itemIdx} className="markdown-li">
                     {renderInline(item)}
                   </li>
                 ))}
@@ -333,9 +340,9 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
 
           case "ol":
             return (
-              <ol key={idx} className="chatgpt-ol">
+              <ol key={idx} className="markdown-ol">
                 {block.items.map((item, itemIdx) => (
-                  <li key={itemIdx} className="chatgpt-li">
+                  <li key={itemIdx} className="markdown-li">
                     {renderInline(item)}
                   </li>
                 ))}
@@ -345,12 +352,12 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
           case "code": {
             const isCopied = copiedIndex === idx;
             return (
-              <div key={idx} className="chatgpt-codeblock-container">
-                <div className="chatgpt-codeblock-header">
-                  <span className="chatgpt-codeblock-lang">{block.language}</span>
+              <div key={idx} className="markdown-codeblock-container">
+                <div className="markdown-codeblock-header">
+                  <span className="markdown-codeblock-lang">{block.language}</span>
                   <button
                     type="button"
-                    className="chatgpt-codeblock-copy"
+                    className="markdown-codeblock-copy"
                     onClick={() => void handleCopyCode(idx, block.content)}
                   >
                     {isCopied ? (
@@ -371,7 +378,7 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
                     )}
                   </button>
                 </div>
-                <pre className="chatgpt-pre">
+                <pre className="markdown-pre">
                   <code>{block.content}</code>
                 </pre>
               </div>
@@ -380,8 +387,8 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
 
           case "table":
             return (
-              <div key={idx} className="chatgpt-table-wrapper">
-                <table className="chatgpt-table">
+              <div key={idx} className="markdown-table-wrapper">
+                <table className="markdown-table">
                   <thead>
                     <tr>
                       {block.headers.map((h, hIdx) => (

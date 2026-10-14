@@ -31,7 +31,7 @@ async function AdminContent() {
 
   return (
     <div className="admin-page-container">
-      <header className="chatgpt-header">
+      <header className="chat-header">
         <Link className="brand" href="/" aria-label="Go to dashboard">
           <span className="brand-mark small">AI</span>
           <span className="brand-title">{appConfig.displayName}</span>

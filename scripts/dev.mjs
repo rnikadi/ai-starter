@@ -37,9 +37,9 @@ function ensureDockerInfrastructure() {
     execSync("docker info", { stdio: "ignore" });
   } catch {
     warn(
-      "Docker is not running or not accessible. Keycloak (:8080) and Archestra (:9000/:3000) will NOT be started.",
+      "Docker is not running or not accessible. Infrastructure & observability (:8080, :9000, :3002, :9090) will NOT be started.",
     );
-    warn("Please start Docker Desktop if you plan to sign in or test AI connectivity.\n");
+    warn("Please start Docker Desktop if you plan to sign in, test AI connectivity, or inspect telemetry.\n");
     return;
   }
 
@@ -52,12 +52,18 @@ function ensureDockerInfrastructure() {
     }
   }
 
-  log("Starting PostgreSQL, Keycloak, and Archestra infrastructure (docker compose up -d)...");
+  log("Starting infrastructure and observability containers (docker compose --profile monitoring up -d)...");
   try {
-    execSync("docker compose up -d", { stdio: "inherit" });
-    log(`${GREEN}✓ Supporting infrastructure containers are running.${RESET}\n`);
+    const envFileArgs = fs.existsSync(".env.local")
+      ? "--env-file .env --env-file .env.local"
+      : fs.existsSync(".env")
+        ? "--env-file .env"
+        : "";
+    const composeCmd = `docker compose ${envFileArgs} --profile monitoring up -d`.trim();
+    execSync(composeCmd, { stdio: "inherit" });
+    log(`${GREEN}✓ Supporting infrastructure and observability containers are running.${RESET}\n`);
   } catch (err) {
-    error("Failed to start Docker containers with docker compose up -d.");
+    error("Failed to start Docker containers with docker compose --profile monitoring up -d.");
     warn("Continuing to start frontend and backend anyway...\n");
   }
 }
@@ -74,9 +80,13 @@ function printDashboard() {
   console.log(`  ${BOLD}Keycloak Auth:${RESET}         http://localhost:8080 (Realm: ai-starter)`);
   console.log(`  ${BOLD}Archestra Gateway:${RESET}     http://localhost:9000 (UI: :3000)`);
   console.log(`  ${BOLD}PostgreSQL (pgvector):${RESET} localhost:5432 (DB: aistarter_db)`);
+  console.log(`  ${BOLD}Grafana Observability:${RESET} http://localhost:3002 (admin/admin)`);
+  console.log(`  ${BOLD}Prometheus Metrics:${RESET}    http://localhost:9090`);
+  console.log(`  ${BOLD}Loki Log Aggregation:${RESET}  http://localhost:3002 (Loki Explore)`);
+  console.log(`  ${BOLD}Tempo Traces:${RESET}          http://localhost:3002 (Tempo Explore)`);
   console.log(`${BOLD}====================================================${RESET}`);
   console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop ONLY the frontend & backend dev servers.`);
-  console.log(`  (PostgreSQL, Keycloak, and Archestra will remain running for fast restart)`);
+  console.log(`  (Infrastructure and observability containers will remain running for fast restart)`);
   console.log(`  To stop Docker containers later, run: ${CYAN}pnpm dev:down${RESET}`);
   console.log(`  To run full containerized demo with Grafana: ${CYAN}pnpm docker:demo${RESET}\n`);
 }
@@ -123,7 +133,7 @@ function handleShutdown() {
 
   console.log(`${GREEN}[dev-runner]${RESET} Frontend and backend servers stopped.`);
   console.log(
-    `${YELLOW}[dev-runner]${RESET} Note: Docker containers are still running. To stop them, run: ${CYAN}pnpm dev:down${RESET}\n`,
+    `${YELLOW}[dev-runner]${RESET} Note: Docker infrastructure & observability containers are still running. To stop them, run: ${CYAN}pnpm dev:down${RESET}\n`,
   );
 
   process.exit(0);

@@ -159,6 +159,41 @@ export const openapiSpec = {
           "404": { $ref: "#/components/responses/NotFound" },
         },
       },
+      patch: {
+        summary: "Update conversation title",
+        description: "Updates the title of a conversation owned by the authenticated user.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Conversation UUID",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateConversationRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Conversation title updated",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationDetailResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
       delete: {
         summary: "Delete a conversation",
         description: "Permanently deletes a conversation and all its messages.",

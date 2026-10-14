@@ -17,6 +17,7 @@ import {
   getConversationById,
   addConversationMessage,
   deleteConversation,
+  updateConversationTitle,
 } from "./repository.js";
 
 describe("Database Conversation Repository", () => {
@@ -114,6 +115,21 @@ describe("Database Conversation Repository", () => {
 
     const result = await deleteConversation("conv-1", "user-1");
     expect(result).toBe(true);
+  });
+
+  it("updates conversation title and returns updated record", async () => {
+    const mockUpdated = { id: "conv-1", userId: "user-1", title: "New Title", updatedAt: new Date() };
+    mockDb.update.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([mockUpdated]),
+        }),
+      }),
+    });
+
+    const result = await updateConversationTitle("conv-1", "user-1", "New Title");
+    expect(result).toEqual(mockUpdated);
+    expect(mockDb.update).toHaveBeenCalled();
   });
 });
 

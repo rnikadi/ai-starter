@@ -31,26 +31,6 @@ async function HomeContent() {
 
           <h1>{appConfig.displayName}</h1>
 
-          <p className="muted">
-            Build, validate, and explore AI-powered application
-            capabilities through a single workspace.
-          </p>
-
-          <div className="feature-list">
-            <div>
-              <span>01</span>
-              <span>Authenticated workspace</span>
-            </div>
-            <div>
-              <span>02</span>
-              <span>Role-based access control</span>
-            </div>
-            <div>
-              <span>03</span>
-              <span>AI provider connectivity test</span>
-            </div>
-          </div>
-
           <KeycloakSignInButton />
 
           <p className="security-note">
@@ -79,8 +59,8 @@ async function HomeContent() {
 
 
   return (
-    <div className="chatgpt-page">
-      <header className="chatgpt-header">
+    <div className="chat-page">
+      <header className="chat-header">
         <Link className="brand" href="/" aria-label="Go to dashboard">
           <span className="brand-mark small">AI</span>
           <span className="brand-title">{appConfig.displayName}</span>

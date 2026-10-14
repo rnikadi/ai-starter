@@ -16,15 +16,15 @@ describe("MarkdownRenderer Component", () => {
     expect(html).toContain("<strong>bold text</strong>");
     expect(html).toContain("<em>italic text</em>");
     expect(html).toContain("<strong><em>bold italic</em></strong>");
-    expect(html).toContain("chatgpt-paragraph");
+    expect(html).toContain("markdown-paragraph");
   });
 
   it("renders inline code elements", () => {
     const markdown = "Use the `fetch()` function to call `/api/ai/test`.";
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<code class="chatgpt-inline-code">fetch()</code>');
-    expect(html).toContain('<code class="chatgpt-inline-code">/api/ai/test</code>');
+    expect(html).toContain('<code class="markdown-inline-code">fetch()</code>');
+    expect(html).toContain('<code class="markdown-inline-code">/api/ai/test</code>');
   });
 
   it("renders headings with nested bold text", () => {
@@ -36,9 +36,9 @@ describe("MarkdownRenderer Component", () => {
 
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<h1 class="chatgpt-h1">Header Level 1</h1>');
-    expect(html).toContain('<h2 class="chatgpt-h2">Header Level 2</h2>');
-    expect(html).toContain('<h3 class="chatgpt-h3"><strong>1. Frontend: Next.js</strong></h3>');
+    expect(html).toContain('<h1 class="markdown-h1">Header Level 1</h1>');
+    expect(html).toContain('<h2 class="markdown-h2">Header Level 2</h2>');
+    expect(html).toContain('<h3 class="markdown-h3"><strong>1. Frontend: Next.js</strong></h3>');
   });
 
   it("renders bulleted lists correctly", () => {
@@ -50,10 +50,10 @@ describe("MarkdownRenderer Component", () => {
 
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<ul class="chatgpt-ul">');
-    expect(html).toContain('<li class="chatgpt-li"><strong>Role</strong>: React-based framework</li>');
-    expect(html).toContain('<li class="chatgpt-li"><strong>AI-Specific Use</strong>: Dynamic UI</li>');
-    expect(html).toContain('<li class="chatgpt-li"><strong>Why Next.js?</strong>: DX and routing</li>');
+    expect(html).toContain('<ul class="markdown-ul">');
+    expect(html).toContain('<li class="markdown-li"><strong>Role</strong>: React-based framework</li>');
+    expect(html).toContain('<li class="markdown-li"><strong>AI-Specific Use</strong>: Dynamic UI</li>');
+    expect(html).toContain('<li class="markdown-li"><strong>Why Next.js?</strong>: DX and routing</li>');
   });
 
   it("renders numbered lists correctly", () => {
@@ -65,10 +65,10 @@ describe("MarkdownRenderer Component", () => {
 
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<ol class="chatgpt-ol">');
-    expect(html).toContain('<li class="chatgpt-li">First step</li>');
-    expect(html).toContain('<li class="chatgpt-li">Second step</li>');
-    expect(html).toContain('<li class="chatgpt-li">Third step</li>');
+    expect(html).toContain('<ol class="markdown-ol">');
+    expect(html).toContain('<li class="markdown-li">First step</li>');
+    expect(html).toContain('<li class="markdown-li">Second step</li>');
+    expect(html).toContain('<li class="markdown-li">Third step</li>');
   });
 
   it("renders fenced code blocks with language and copy button", () => {
@@ -81,8 +81,8 @@ describe("MarkdownRenderer Component", () => {
 
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain("chatgpt-codeblock-container");
-    expect(html).toContain('<span class="chatgpt-codeblock-lang">typescript</span>');
+    expect(html).toContain("markdown-codeblock-container");
+    expect(html).toContain('<span class="markdown-codeblock-lang">typescript</span>');
     expect(html).toContain("Copy code");
     expect(html).toContain("const message = &#x27;Hello world&#x27;;");
   });
@@ -91,14 +91,14 @@ describe("MarkdownRenderer Component", () => {
     const markdown = ["Section 1", "---", "Section 2"].join("\n\n");
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<hr class="chatgpt-hr"/>');
+    expect(html).toContain('<hr class="markdown-hr"/>');
   });
 
   it("renders blockquotes", () => {
     const markdown = "> This is an important quote from the model.";
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<blockquote class="chatgpt-blockquote">This is an important quote from the model.</blockquote>');
+    expect(html).toContain('<blockquote class="markdown-blockquote">This is an important quote from the model.</blockquote>');
   });
 
   it("renders tables with headers and rows", () => {
@@ -111,7 +111,7 @@ describe("MarkdownRenderer Component", () => {
 
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<table class="chatgpt-table">');
+    expect(html).toContain('<table class="markdown-table">');
     expect(html).toContain("<th>Service</th>");
     expect(html).toContain("<td>Frontend</td>");
     expect(html).toContain("<td>3001</td>");
@@ -122,7 +122,20 @@ describe("MarkdownRenderer Component", () => {
     const markdown = "Visit [OpenTelemetry Docs](https://opentelemetry.io) for more information.";
     const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
 
-    expect(html).toContain('<a href="https://opentelemetry.io" target="_blank" rel="noopener noreferrer" class="chatgpt-link">OpenTelemetry Docs</a>');
+    expect(html).toContain('<a href="https://opentelemetry.io" target="_blank" rel="noopener noreferrer" class="markdown-link">OpenTelemetry Docs</a>');
+  });
+
+  it("preserves soft line breaks with <br/> inside paragraphs", () => {
+    const markdown = [
+      "**Role**: React-based framework",
+      "**AI-Specific Use**: Dynamic UI",
+      "**Why Next.js?**: DX and routing",
+    ].join("\n");
+
+    const html = renderToStaticMarkup(<MarkdownRenderer content={markdown} />);
+
+    expect(html).toContain("<br/>");
+    expect(html).toContain("<strong>Role</strong>: React-based framework<br/><strong>AI-Specific Use</strong>: Dynamic UI<br/><strong>Why Next.js?</strong>: DX and routing");
   });
 });
 

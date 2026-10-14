@@ -59,6 +59,12 @@ vi.mock("./db/repository.js", () => ({
   deleteConversation: vi.fn(async (conversationId: string) => {
     return conversationId === "conv-mock-123";
   }),
+  updateConversationTitle: vi.fn(async (conversationId: string, userId: string, title: string) => {
+    if (conversationId === "conv-mock-123") {
+      return { id: conversationId, userId, title, updatedAt: new Date() };
+    }
+    return null;
+  }),
   getDatabaseStats: vi.fn(async () => ({
     status: "healthy",
     totalConversations: 5,
@@ -384,6 +390,34 @@ describe("Backend Server Endpoints", () => {
       headers: {
         "x-user-roles": JSON.stringify(["developer"]),
       },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("renames a conversation on PATCH /api/conversations/:id", async () => {
+    const res = await executeRequest(server, {
+      method: "PATCH",
+      url: "/api/conversations/conv-mock-123",
+      headers: {
+        "content-type": "application/json",
+        "x-user-roles": JSON.stringify(["developer"]),
+      },
+      body: { title: "Renamed Chat" },
+    });
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body) as { conversation: { title: string } };
+    expect(json.conversation.title).toBe("Renamed Chat");
+  });
+
+  it("returns 404 when renaming non-existent conversation on PATCH /api/conversations/:id", async () => {
+    const res = await executeRequest(server, {
+      method: "PATCH",
+      url: "/api/conversations/non-existent-id",
+      headers: {
+        "content-type": "application/json",
+        "x-user-roles": JSON.stringify(["developer"]),
+      },
+      body: { title: "Renamed Chat" },
     });
     expect(res.statusCode).toBe(404);
   });

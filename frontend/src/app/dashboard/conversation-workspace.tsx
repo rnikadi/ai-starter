@@ -55,11 +55,25 @@ export function ConversationWorkspace({
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [menuOpenConvId, setMenuOpenConvId] = useState<string | null>(null);
+  const [editingConvId, setEditingConvId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isViewer = !canTestAI;
+
+  // Close thread menu on click outside
+  useEffect(() => {
+    function handleClickOutside() {
+      setMenuOpenConvId(null);
+    }
+    if (menuOpenConvId) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [menuOpenConvId]);
 
   async function handleCopy(id: string, text: string) {
     try {
@@ -138,7 +152,7 @@ export function ConversationWorkspace({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: `Chat ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+          title: "New chat",
         }),
       });
       if (res.ok) {
@@ -154,9 +168,34 @@ export function ConversationWorkspace({
     }
   }
 
-  // 4. Delete a conversation thread
-  async function handleDelete(convId: string, event: React.MouseEvent) {
-    event.stopPropagation();
+  // 4. Rename a conversation thread
+  async function handleSaveRename(convId: string) {
+    const trimmed = editingTitle.trim();
+    if (!trimmed) {
+      setEditingConvId(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(convId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmed }),
+      });
+      if (res.ok) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === convId ? { ...c, title: trimmed } : c)),
+        );
+      }
+    } catch {
+      setError("Failed to rename conversation.");
+    } finally {
+      setEditingConvId(null);
+    }
+  }
+
+  // 5. Delete a conversation thread
+  async function handleDelete(convId: string, event?: React.MouseEvent) {
+    event?.stopPropagation();
     if (!canTestAI) return;
     try {
       const res = await fetch(`/api/conversations/${encodeURIComponent(convId)}`, {
@@ -174,7 +213,7 @@ export function ConversationWorkspace({
     }
   }
 
-  // 5. Submit AI Prompt
+  // 6. Submit AI Prompt
   async function executePrompt(textToSend: string) {
     if (!canTestAI || loading || !textToSend.trim()) return;
 
@@ -188,14 +227,14 @@ export function ConversationWorkspace({
 
     let targetConvId = activeConvId;
 
-    // If no active conversation, create one first
+    // If no active conversation, create one first with prompt snippet
     if (!targetConvId) {
       try {
-        const titleSnippet = userText.slice(0, 36);
+        const titleSnippet = userText.slice(0, 32).trim() || "New chat";
         const res = await fetch("/api/conversations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: titleSnippet || "New Conversation" }),
+          body: JSON.stringify({ title: titleSnippet }),
         });
         if (res.ok) {
           const data = (await res.json()) as { conversation: Conversation };
@@ -205,6 +244,23 @@ export function ConversationWorkspace({
         }
       } catch {
         // Fall back to executing without persistence if creation fails
+      }
+    } else {
+      // If the active conversation still has default "New chat" title, rename it to the user's prompt snippet
+      const currentConv = conversations.find((c) => c.id === targetConvId);
+      if (currentConv && (currentConv.title === "New chat" || currentConv.title.startsWith("Chat "))) {
+        const newTitle = userText.slice(0, 32).trim() || "New chat";
+        void fetch(`/api/conversations/${encodeURIComponent(targetConvId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle }),
+        }).then((res) => {
+          if (res.ok) {
+            setConversations((prev) =>
+              prev.map((c) => (c.id === targetConvId ? { ...c, title: newTitle } : c)),
+            );
+          }
+        });
       }
     }
 
@@ -266,17 +322,15 @@ export function ConversationWorkspace({
     }
   }
 
-  const activeTitle = conversations.find((c) => c.id === activeConvId)?.title || "ChatGPT";
-
   return (
-    <div className="chatgpt-layout">
+    <div className="chat-layout">
       {/* 1. Left Sidebar (Unified theme matching admin console) */}
-      <aside className="chatgpt-sidebar">
-        <div className="chatgpt-sidebar-top">
+      <aside className="chat-sidebar">
+        <div className="chat-sidebar-top">
           {canTestAI ? (
             <button
               type="button"
-              className="chatgpt-new-chat-btn"
+              className="chat-new-btn"
               onClick={handleNewThread}
               disabled={loading}
             >
@@ -296,38 +350,46 @@ export function ConversationWorkspace({
               <span>New chat</span>
             </button>
           ) : (
-            <div className="chatgpt-sidebar-viewer-banner">
+            <div className="chat-sidebar-viewer-banner">
               <span>Viewer Mode (Read-Only)</span>
             </div>
           )}
         </div>
 
         {/* Conversation List */}
-        <div className="chatgpt-threads-scroll">
-          <div className="chatgpt-threads-heading">Recent Chats</div>
+        <div className="chat-threads-scroll">
+          <div className="chat-threads-heading">Recent Chats</div>
 
           {loadingConvs && (
-            <div className="chatgpt-threads-empty">Loading history...</div>
+            <div className="chat-threads-empty">Loading history...</div>
           )}
 
           {!loadingConvs && conversations.length === 0 && (
-            <div className="chatgpt-threads-empty">No conversations yet</div>
+            <div className="chat-threads-empty">No conversations yet</div>
           )}
 
           {conversations.map((conv) => {
             const isActive = conv.id === activeConvId;
+            const isEditing = conv.id === editingConvId;
+            const isMenuOpen = conv.id === menuOpenConvId;
+
             return (
               <div
                 key={conv.id}
-                className={`chatgpt-thread-item ${isActive ? "active" : ""}`}
-                onClick={() => setActiveConvId(conv.id)}
+                className={`chat-thread-item ${isActive ? "active" : ""}`}
+                onClick={() => {
+                  if (!isEditing) {
+                    setActiveConvId(conv.id);
+                    setMenuOpenConvId(null);
+                  }
+                }}
                 role="button"
                 tabIndex={0}
               >
                 <svg
-                  className="chatgpt-thread-icon"
-                  width="15"
-                  height="15"
+                  className="chat-thread-icon"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -338,30 +400,101 @@ export function ConversationWorkspace({
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
 
-                <span className="chatgpt-thread-title">{conv.title}</span>
-
-                {canTestAI && (
-                  <button
-                    type="button"
-                    className="chatgpt-thread-del-btn"
-                    onClick={(e) => void handleDelete(conv.id, e)}
-                    title="Delete chat"
-                    aria-label="Delete chat"
+                {isEditing ? (
+                  <form
+                    className="chat-thread-rename-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleSaveRename(conv.id);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                    <input
+                      type="text"
+                      className="chat-thread-rename-input"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setEditingConvId(null);
+                        }
+                      }}
+                      autoFocus
+                      maxLength={64}
+                    />
+                    <button type="submit" className="chat-thread-rename-btn" title="Save">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-thread-rename-btn cancel"
+                      onClick={() => setEditingConvId(null)}
+                      title="Cancel"
                     >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </form>
+                ) : (
+                  <span className="chat-thread-title">{conv.title}</span>
+                )}
+
+                {canTestAI && !isEditing && (
+                  <div className="chat-thread-actions-wrapper" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className={`chat-thread-menu-btn ${isMenuOpen ? "active" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenConvId((prev) => (prev === conv.id ? null : conv.id));
+                      }}
+                      title="More options"
+                      aria-label="More options"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="19" cy="12" r="2" />
+                        <circle cx="5" cy="12" r="2" />
+                      </svg>
+                    </button>
+
+                    {isMenuOpen && (
+                      <div className="chat-thread-dropdown">
+                        <button
+                          type="button"
+                          className="chat-thread-dropdown-item"
+                          onClick={() => {
+                            setEditingConvId(conv.id);
+                            setEditingTitle(conv.title);
+                            setMenuOpenConvId(null);
+                          }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                          </svg>
+                          <span>Rename</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="chat-thread-dropdown-item danger"
+                          onClick={(e) => {
+                            setMenuOpenConvId(null);
+                            void handleDelete(conv.id, e);
+                          }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -370,41 +503,36 @@ export function ConversationWorkspace({
       </aside>
 
       {/* 2. Main Chat Area */}
-      <section className="chatgpt-main">
-        {/* Subtle top subheader */}
-        <div className="chatgpt-chat-topbar">
-          <span className="chatgpt-active-thread-name">{activeTitle}</span>
-        </div>
-
+      <section className="chat-main">
         {/* Message Stream */}
-        <div className="chatgpt-message-stream">
+        <div className="chat-message-stream">
           {error && <div className="notice-banner error">{error}</div>}
 
           {/* Empty State */}
           {!loadingMessages && messages.length === 0 && (
-            <div className="chatgpt-empty-view">
-              <div className="chatgpt-empty-logo">AI</div>
-              <h1 className="chatgpt-empty-title">What can I help with today?</h1>
+            <div className="chat-empty-view">
+              <div className="chat-empty-logo">AI</div>
+              <h1 className="chat-empty-title">What can I help with today?</h1>
 
               {isViewer && (
-                <p className="chatgpt-empty-viewer-notice">
+                <p className="chat-empty-viewer-notice">
                   You are logged in with the <strong>Viewer</strong> role. You can browse
                   saved conversations and model responses, but prompt execution is restricted.
                 </p>
               )}
 
               {canTestAI && (
-                <div className="chatgpt-starters-grid">
+                <div className="chat-starters-grid">
                   {STARTER_PROMPTS.map((item) => (
                     <button
                       key={item.title}
                       type="button"
-                      className="chatgpt-starter-card"
+                      className="chat-starter-card"
                       onClick={() => void executePrompt(item.prompt)}
                       disabled={loading}
                     >
-                      <span className="chatgpt-starter-title">{item.title}</span>
-                      <span className="chatgpt-starter-sub">{item.subtitle}</span>
+                      <span className="chat-starter-title">{item.title}</span>
+                      <span className="chat-starter-sub">{item.subtitle}</span>
                     </button>
                   ))}
                 </div>
@@ -414,7 +542,7 @@ export function ConversationWorkspace({
 
           {/* Message List */}
           {loadingMessages && (
-            <div className="chatgpt-loading-messages">Loading messages...</div>
+            <div className="chat-loading-messages">Loading messages...</div>
           )}
 
           {messages.map((msg) => {
@@ -422,25 +550,25 @@ export function ConversationWorkspace({
             return (
               <div
                 key={msg.id}
-                className={`chatgpt-message-row ${isUser ? "user" : "assistant"}`}
+                className={`chat-message-row ${isUser ? "user" : "assistant"}`}
               >
-                <div className="chatgpt-message-inner">
+                <div className="chat-message-inner">
                   <div
-                    className={`chatgpt-message-avatar ${isUser ? "user" : "assistant"}`}
+                    className={`chat-message-avatar ${isUser ? "user" : "assistant"}`}
                   >
                     {isUser ? "You" : "AI"}
                   </div>
 
-                  <div className="chatgpt-message-content">
+                  <div className="chat-message-content">
                     {isUser ? (
-                      <div className="chatgpt-message-text">{msg.content}</div>
+                      <div className="chat-message-text">{msg.content}</div>
                     ) : (
                       <MarkdownRenderer content={msg.content} />
                     )}
                     {!isUser && (
                       <button
                         type="button"
-                        className="chatgpt-copy-btn"
+                        className="chat-copy-btn"
                         onClick={() => void handleCopy(msg.id, msg.content)}
                         title="Copy to clipboard"
                         aria-label="Copy message"
@@ -471,11 +599,11 @@ export function ConversationWorkspace({
 
           {/* Loading Indicator */}
           {loading && (
-            <div className="chatgpt-message-row assistant">
-              <div className="chatgpt-message-inner">
-                <div className="chatgpt-message-avatar assistant">AI</div>
-                <div className="chatgpt-message-content">
-                  <div className="chatgpt-thinking-dots">
+            <div className="chat-message-row assistant">
+              <div className="chat-message-inner">
+                <div className="chat-message-avatar assistant">AI</div>
+                <div className="chat-message-content loading">
+                  <div className="chat-thinking-dots">
                     <span />
                     <span />
                     <span />
@@ -489,12 +617,12 @@ export function ConversationWorkspace({
         </div>
 
         {/* 3. Bottom Floating Input Bar */}
-        <div className="chatgpt-input-dock">
-          <form className="chatgpt-input-form" onSubmit={handleSubmit}>
-            <div className="chatgpt-input-wrapper">
+        <div className="chat-input-dock">
+          <form className="chat-input-form" onSubmit={handleSubmit}>
+            <div className="chat-input-wrapper">
               <textarea
                 ref={textareaRef}
-                className="chatgpt-textarea"
+                className="chat-textarea"
                 rows={1}
                 placeholder={
                   isViewer
@@ -513,7 +641,7 @@ export function ConversationWorkspace({
 
               <button
                 type="submit"
-                className="chatgpt-send-button"
+                className="chat-send-btn"
                 disabled={isViewer || loading || !prompt.trim()}
                 aria-label="Send prompt"
               >
@@ -534,7 +662,7 @@ export function ConversationWorkspace({
             </div>
           </form>
 
-          <p className="chatgpt-disclaimer">
+          <p className="chat-disclaimer">
             AI responses may contain inaccuracies. Verify important information.
           </p>
         </div>
