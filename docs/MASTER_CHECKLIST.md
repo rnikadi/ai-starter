@@ -62,9 +62,11 @@ production-readiness requirements.
 
 -   [x] Reserve host port 4000 for the standalone Node.js API backend.
 
+-   [x] Reserve host port 8080 for Keycloak IAM.
+
 -   [x] Reserve host port 9000 for the Archestra LLM proxy.
 
--   [x] Configure Keycloak to use host port 8080.
+-   [x] Reserve host port 9090 for Prometheus metric collection.
 
 -   [x] Bind local development services to loopback where configured.
 
@@ -351,7 +353,7 @@ before assuming that every exported setting has been applied.
 
 -   [x] Configure production multi-stage Dockerfiles for frontend and backend.
 
--   [x] Configure centralized visual logging stack with Grafana, Loki, and Promtail.
+-   [x] Configure centralized visual logging and metrics stack with Grafana, Loki, Promtail, and Prometheus.
 
 -   [x] Implement GitHub Actions CI verification workflow (`.github/workflows/ci.yml`).
 

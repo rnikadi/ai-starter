@@ -52,8 +52,14 @@ services:
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_FORMAT: "json"
     depends_on:
-      - keycloak
-      - archestra
+      keycloak:
+        condition: service_started
+      archestra:
+        condition: service_started
+      loki:
+        condition: service_healthy
+      promtail:
+        condition: service_started
 
   frontend:
     build:
@@ -76,8 +82,10 @@ services:
       AUTH_KEYCLOAK_SECRET: "${AUTH_KEYCLOAK_SECRET:-ai-starter-kit-local-client-secret}"
       LOG_FORMAT: "json"
     depends_on:
-      - backend
-      - keycloak
+      backend:
+        condition: service_started
+      keycloak:
+        condition: service_started
 
   # Observability Stack (activated with profile: monitoring or full)
   loki:
@@ -91,6 +99,12 @@ services:
     volumes:
       - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
       - loki-data:/loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3100/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
 
   promtail:
     image: grafana/promtail:3.3.0
@@ -103,7 +117,23 @@ services:
       - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
-      - loki
+      loki:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: ai-starter-prometheus
+    restart: unless-stopped
+    profiles: ["full", "monitoring"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
 
   grafana:
     image: grafana/grafana:11.4.0
@@ -117,13 +147,17 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "admin"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: "http://localhost:3002"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/application-logs.json"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
-      - loki
+      loki:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
 
 volumes:
   postgres-data:
@@ -134,5 +168,7 @@ volumes:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-keycloak-data
   loki-data:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-loki-data
+  prometheus-data:
+    name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-prometheus-data
   grafana-data:
     name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}-grafana-data

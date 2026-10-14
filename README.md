@@ -409,13 +409,13 @@ pnpm dev:frontend  # Starts the Next.js frontend alone on http://localhost:3001
 Recommended for stakeholder demos, presentations, or testing production Docker images:
 
 ```bash
-# Builds and starts all 7 containers:
+# Builds and starts all containers:
 # Frontend (:3001), Backend (:4000), Keycloak (:8080), Archestra (:9000/:3000),
-# Grafana (:3002), Loki (:3100), and Promtail
+# Grafana (:3002), Loki (:3100), Promtail, and Prometheus (:9090)
 pnpm docker:demo
 
-# Open Grafana to inspect live visual logs across all 4 services
-open http://localhost:3002  # Default login: admin / admin
+# Open Grafana to inspect live visual logs across all services
+open http://localhost:3002  # Default login: admin / admin (lands on Application Logs Overview)
 
 # Check container status
 pnpm docker:status
@@ -426,10 +426,10 @@ pnpm docker:down
 
 #### Optional: Standalone Observability with Host Dev
 
-If you are developing locally with `pnpm dev` and want to spin up Grafana & Loki to visualize logs from Keycloak and Archestra:
+If you are developing locally with `pnpm dev` and want to spin up Grafana & Loki to visualize logs and metrics from Keycloak and Archestra:
 
 ```bash
-pnpm monitoring:up     # Starts Loki (:3100), Promtail, and Grafana (:3002)
+pnpm monitoring:up     # Starts Loki (:3100), Promtail, Prometheus (:9090), and Grafana (:3002)
 pnpm monitoring:down   # Stops monitoring containers
 ```
 
