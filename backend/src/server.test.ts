@@ -73,6 +73,46 @@ vi.mock("./db/repository.js", () => ({
   clearAllConversations: vi.fn(async () => ({
     success: true,
   })),
+  createDocument: vi.fn(async (data: { title: string; content: string; metadata?: string; embedding?: number[] }) => ({
+    id: "doc-mock-123",
+    title: data.title,
+    content: data.content,
+    metadata: data.metadata || null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })),
+  listDocuments: vi.fn(async () => [
+    {
+      id: "doc-mock-123",
+      title: "Test Document",
+      metadata: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ]),
+  getDocumentById: vi.fn(async (id: string) => {
+    if (id === "doc-mock-123") {
+      return {
+        id: "doc-mock-123",
+        title: "Test Document",
+        content: "Document content here",
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    return null;
+  }),
+  deleteDocument: vi.fn(async (id: string) => id === "doc-mock-123"),
+  searchSimilarDocuments: vi.fn(async () => [
+    {
+      id: "doc-mock-123",
+      title: "Test Document",
+      content: "Document content here",
+      metadata: null,
+      similarity: 0.95,
+    },
+  ]),
 }));
 
 interface MockResponse {
@@ -500,5 +540,136 @@ describe("Backend Server Endpoints", () => {
   it("returns 404 for unknown routes", async () => {
     const res = await executeRequest(server, { url: "/unknown-route" });
     expect(res.statusCode).toBe(404);
+  });
+
+  describe("Active RAG & Knowledge Base Endpoints", () => {
+    it("lists documents on GET /api/documents for authenticated user", async () => {
+      const res = await executeRequest(server, {
+        url: "/api/documents",
+        headers: {
+          "x-user-roles": JSON.stringify(["viewer"]),
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body) as { documents: unknown[] };
+      expect(Array.isArray(json.documents)).toBe(true);
+      expect(json.documents.length).toBeGreaterThan(0);
+    });
+
+    it("creates a document on POST /api/documents with developer role", async () => {
+      const res = await executeRequest(server, {
+        method: "POST",
+        url: "/api/documents",
+        headers: {
+          "content-type": "application/json",
+          "x-user-roles": JSON.stringify(["developer"]),
+        },
+        body: {
+          title: "Architecture Guide",
+          content: "OpenTelemetry and Grafana dashboards for microservices.",
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const json = JSON.parse(res.body) as { document: { id: string; title: string } };
+      expect(json.document.id).toBe("doc-mock-123");
+      expect(json.document.title).toBe("Architecture Guide");
+    });
+
+    it("rejects document creation with missing title or content", async () => {
+      const res = await executeRequest(server, {
+        method: "POST",
+        url: "/api/documents",
+        headers: {
+          "content-type": "application/json",
+          "x-user-roles": JSON.stringify(["developer"]),
+        },
+        body: {
+          title: "",
+          content: "",
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      const json = JSON.parse(res.body) as { error: string };
+      expect(json.error).toContain("required");
+    });
+
+    it("retrieves a document by id on GET /api/documents/:id", async () => {
+      const res = await executeRequest(server, {
+        url: "/api/documents/doc-mock-123",
+        headers: {
+          "x-user-roles": JSON.stringify(["developer"]),
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body) as { document: { id: string } };
+      expect(json.document.id).toBe("doc-mock-123");
+    });
+
+    it("returns 404 for unknown document on GET /api/documents/:id", async () => {
+      const res = await executeRequest(server, {
+        url: "/api/documents/unknown-doc",
+        headers: {
+          "x-user-roles": JSON.stringify(["developer"]),
+        },
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("deletes a document on DELETE /api/documents/:id", async () => {
+      const res = await executeRequest(server, {
+        method: "DELETE",
+        url: "/api/documents/doc-mock-123",
+        headers: {
+          "x-user-roles": JSON.stringify(["admin"]),
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body) as { success: boolean };
+      expect(json.success).toBe(true);
+    });
+
+    it("performs vector similarity search on POST /api/rag/search", async () => {
+      const res = await executeRequest(server, {
+        method: "POST",
+        url: "/api/rag/search",
+        headers: {
+          "content-type": "application/json",
+          "x-user-roles": JSON.stringify(["developer"]),
+        },
+        body: {
+          query: "How is tracing implemented with Tempo?",
+          limit: 3,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body) as { results: Array<{ id: string; similarity: number }> };
+      expect(Array.isArray(json.results)).toBe(true);
+      expect(json.results[0]?.similarity).toBe(0.95);
+    });
+
+    it("executes AI test with active RAG context augmentation and tracks tokens", async () => {
+      const res = await executeRequest(server, {
+        method: "POST",
+        url: "/api/ai/test",
+        headers: {
+          "content-type": "application/json",
+          "x-user-roles": JSON.stringify(["developer"]),
+        },
+        body: {
+          prompt: "What is the platform observability architecture?",
+          rag: true,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body) as {
+        result: string;
+        ragContext?: unknown[];
+        usage?: { promptTokens: number; completionTokens: number };
+      };
+      expect(json.result).toBeDefined();
+      expect(Array.isArray(json.ragContext)).toBe(true);
+      expect(json.usage).toBeDefined();
+      expect(json.usage?.promptTokens).toBeGreaterThan(0);
+    });
   });
 });

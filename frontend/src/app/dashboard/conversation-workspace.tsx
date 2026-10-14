@@ -53,7 +53,7 @@ export function ConversationWorkspace({
   const [loading, setLoading] = useState(false);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string; traceId?: string } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [menuOpenConvId, setMenuOpenConvId] = useState<string | null>(null);
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
@@ -164,7 +164,7 @@ export function ConversationWorkspace({
         textareaRef.current?.focus();
       }
     } catch {
-      setError("Failed to create new conversation.");
+      setError({ message: "Failed to create new conversation." });
     }
   }
 
@@ -187,7 +187,7 @@ export function ConversationWorkspace({
         );
       }
     } catch {
-      setError("Failed to rename conversation.");
+      setError({ message: "Failed to rename conversation." });
     } finally {
       setEditingConvId(null);
     }
@@ -209,7 +209,7 @@ export function ConversationWorkspace({
         }
       }
     } catch {
-      setError("Failed to delete conversation.");
+      setError({ message: "Failed to delete conversation." });
     }
   }
 
@@ -217,7 +217,7 @@ export function ConversationWorkspace({
   async function executePrompt(textToSend: string) {
     if (!canTestAI || loading || !textToSend.trim()) return;
 
-    setError("");
+    setError(null);
     setLoading(true);
     const userText = textToSend.trim();
     setPrompt("");
@@ -287,11 +287,15 @@ export function ConversationWorkspace({
       const data = (await response.json()) as {
         result?: string;
         error?: string;
+        traceId?: string;
         conversationId?: string;
       };
 
       if (!response.ok) {
-        setError(data.error ?? `Request failed (${response.status}).`);
+        setError({
+          message: data.error ?? `Request failed (${response.status}).`,
+          traceId: data.traceId || response.headers.get("x-trace-id") || undefined,
+        });
         return;
       }
 
@@ -304,7 +308,9 @@ export function ConversationWorkspace({
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
-      setError("Could not reach backend API server. Check container logs.");
+      setError({
+        message: "Could not reach backend API server. Check container logs.",
+      });
     } finally {
       setLoading(false);
     }
@@ -506,7 +512,34 @@ export function ConversationWorkspace({
       <section className="chat-main">
         {/* Message Stream */}
         <div className="chat-message-stream">
-          {error && <div className="notice-banner error">{error}</div>}
+          {error && (
+            <div
+              className="notice-banner error"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <span>{error.message}</span>
+              {error.traceId && (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    opacity: 0.85,
+                    fontFamily: "monospace",
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    background: "rgba(0,0,0,0.15)",
+                  }}
+                  title="OpenTelemetry Trace Correlation ID"
+                >
+                  Trace: {error.traceId}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Empty State */}
           {!loadingMessages && messages.length === 0 && (

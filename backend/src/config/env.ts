@@ -11,6 +11,7 @@ export const backendEnvSchema = z.object({
   ARCHESTRA_BASE_URL: z.string().url("ARCHESTRA_BASE_URL must be a valid URL"),
   ARCHESTRA_VIRTUAL_KEY: z.string().min(1, "ARCHESTRA_VIRTUAL_KEY is required"),
   ARCHESTRA_MODEL: z.string().min(1, "ARCHESTRA_MODEL is required"),
+  ARCHESTRA_EMBEDDING_MODEL: z.string().default("nvidia/nemotron-3-embed-1b:free"),
   FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid PostgreSQL connection URL"),
   BACKEND_URL: z.string().url().optional(),

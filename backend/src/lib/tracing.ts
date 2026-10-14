@@ -136,6 +136,17 @@ export async function traceAsync<T>(
   });
 }
 
+export function getActiveTraceId(): string | undefined {
+  const activeSpan = trace.getActiveSpan();
+  if (activeSpan) {
+    const traceId = activeSpan.spanContext().traceId;
+    if (traceId && traceId !== "00000000000000000000000000000000") {
+      return traceId;
+    }
+  }
+  return undefined;
+}
+
 export async function shutdownTracing(): Promise<void> {
   if (provider) {
     try {

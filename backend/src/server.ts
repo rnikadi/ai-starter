@@ -21,6 +21,11 @@ import {
   updateConversationTitle,
   getDatabaseStats,
   clearAllConversations,
+  createDocument,
+  listDocuments,
+  getDocumentById,
+  deleteDocument,
+  searchSimilarDocuments,
 } from "./db/repository.js";
 import {
   getPrometheusMetrics,
@@ -29,7 +34,21 @@ import {
   httpRequestDurationSeconds,
   aiRequestsTotal,
   aiRequestDurationSeconds,
+  recordAiTokenUsage,
 } from "./lib/metrics.js";
+import {
+  sendError,
+  HttpError,
+  BadRequestError,
+  NotFoundError,
+  PayloadTooLargeError,
+  ServiceUnavailableError,
+} from "./lib/errors.js";
+import {
+  generateEmbedding,
+  buildRagPrompt,
+  type RetrievedDocument,
+} from "./lib/rag.js";
 import {
   getTracer,
   extractTraceContext,
@@ -46,13 +65,7 @@ const helmetMiddleware = helmet({
   crossOriginEmbedderPolicy: false,
 });
 
-export class PayloadTooLargeError extends Error {
-  readonly statusCode = 413;
-  constructor(message = "Payload too large. Maximum allowed size is 1MB.") {
-    super(message);
-    this.name = "PayloadTooLargeError";
-  }
-}
+export { PayloadTooLargeError };
 
 const MAX_JSON_BODY_BYTES = 1024 * 1024; // 1 MB
 
@@ -66,8 +79,13 @@ function normalizeRouteLabel(pathname: string): string {
       return "/api/conversations/:id";
     }
   }
+  if (pathname.startsWith("/api/documents/")) {
+    return "/api/documents/:id";
+  }
   if (
     pathname === "/api/conversations" ||
+    pathname === "/api/documents" ||
+    pathname === "/api/rag/search" ||
     pathname === "/api/ai/test" ||
     pathname === "/api/admin/status" ||
     pathname === "/api/admin/conversations/clear" ||
@@ -167,8 +185,8 @@ async function readJsonBody(
       }
       try {
         resolve(JSON.parse(body));
-      } catch (err) {
-        reject(err);
+      } catch {
+        reject(new BadRequestError("Request body must be valid JSON.", "INVALID_JSON"));
       }
     });
 
@@ -569,7 +587,137 @@ export function createBackendServer(): http.Server {
       }
     }
 
-    // 7. AI Test Endpoint
+    // 7. Knowledge Base & Vector Search Endpoints
+    if (req.method === "GET" && pathname === "/api/documents") {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      try {
+        const docs = await listDocuments(50);
+        sendJson(res, 200, { documents: docs });
+      } catch (err) {
+        sendError(res, err, traceId);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/documents") {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      if (!guardRoles(res, user, ["developer", "admin"])) return;
+
+      let body: unknown;
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        sendError(res, err, traceId);
+        return;
+      }
+
+      const raw = body as Record<string, unknown>;
+      const title = typeof raw?.title === "string" ? raw.title.trim() : "";
+      const content = typeof raw?.content === "string" ? raw.content.trim() : "";
+      const metadata =
+        typeof raw?.metadata === "string"
+          ? raw.metadata
+          : raw?.metadata !== undefined
+          ? JSON.stringify(raw.metadata)
+          : undefined;
+
+      if (!title || !content) {
+        sendError(
+          res,
+          new BadRequestError("Both 'title' and 'content' are required non-empty strings."),
+          traceId,
+        );
+        return;
+      }
+
+      try {
+        const embedding = await generateEmbedding(content);
+        const doc = await createDocument({ title, content, metadata, embedding });
+        sendJson(res, 201, { document: doc });
+      } catch (err) {
+        sendError(res, err, traceId);
+      }
+      return;
+    }
+
+    const documentDetailMatch = pathname.match(/^\/api\/documents\/([^/]+)$/);
+    if (documentDetailMatch) {
+      const docId = documentDetailMatch[1];
+
+      if (req.method === "GET") {
+        const user = await guardAuth(req, res);
+        if (!user) return;
+
+        try {
+          const doc = await getDocumentById(docId);
+          if (!doc) {
+            sendError(res, new NotFoundError("Document not found."), traceId);
+            return;
+          }
+          sendJson(res, 200, { document: doc });
+        } catch (err) {
+          sendError(res, err, traceId);
+        }
+        return;
+      }
+
+      if (req.method === "DELETE") {
+        const user = await guardAuth(req, res);
+        if (!user) return;
+
+        if (!guardRoles(res, user, ["developer", "admin"])) return;
+
+        try {
+          const deleted = await deleteDocument(docId);
+          if (!deleted) {
+            sendError(res, new NotFoundError("Document not found."), traceId);
+            return;
+          }
+          sendJson(res, 200, { success: true });
+        } catch (err) {
+          sendError(res, err, traceId);
+        }
+        return;
+      }
+    }
+
+    if (req.method === "POST" && pathname === "/api/rag/search") {
+      const user = await guardAuth(req, res);
+      if (!user) return;
+
+      let body: unknown;
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        sendError(res, err, traceId);
+        return;
+      }
+
+      const raw = body as Record<string, unknown>;
+      const query = typeof raw?.query === "string" ? raw.query.trim() : "";
+      const limit = typeof raw?.limit === "number" && raw.limit > 0 ? Math.min(raw.limit, 20) : 5;
+      const threshold = typeof raw?.threshold === "number" ? raw.threshold : 0.0;
+
+      if (!query) {
+        sendError(res, new BadRequestError("The 'query' field must be a non-empty string."), traceId);
+        return;
+      }
+
+      try {
+        const queryEmbedding = await generateEmbedding(query);
+        const results = await searchSimilarDocuments(queryEmbedding, limit, threshold);
+        sendJson(res, 200, { results });
+      } catch (err) {
+        sendError(res, err, traceId);
+      }
+      return;
+    }
+
+    // 8. AI Test Endpoint
     if (req.method === "POST" && pathname === "/api/ai/test") {
       // Stricter rate limit for AI operations
       if (!applyRateLimit(req, res, aiRateLimiter)) {
@@ -587,16 +735,22 @@ export function createBackendServer(): http.Server {
         body = await readJsonBody(req);
       } catch (err) {
         if (err instanceof PayloadTooLargeError) {
-          sendJson(res, 413, { error: err.message });
+          sendError(res, err, traceId);
           return;
         }
-        sendJson(res, 400, { error: "Request body must be valid JSON." });
+        sendError(res, new BadRequestError("Request body must be valid JSON."), traceId);
         return;
       }
 
       const validation = validateAiTestRequest(body);
       if (!validation.success) {
-        sendJson(res, validation.status, { error: validation.error });
+        sendError(
+          res,
+          validation.status === 413
+            ? new PayloadTooLargeError(validation.error)
+            : new BadRequestError(validation.error),
+          traceId,
+        );
         return;
       }
 
@@ -605,7 +759,7 @@ export function createBackendServer(): http.Server {
         try {
           const conv = await getConversationById(validation.conversationId, userId);
           if (!conv) {
-            sendJson(res, 404, { error: "Conversation not found." });
+            sendError(res, new NotFoundError("Conversation not found."), traceId);
             return;
           }
           await addConversationMessage(validation.conversationId, "user", validation.prompt);
@@ -613,7 +767,7 @@ export function createBackendServer(): http.Server {
           reqLogger.error("Failed to check conversation or persist user message", {
             err: error instanceof Error ? error.message : String(error),
           });
-          sendJson(res, 500, { error: "Failed to persist conversation message." });
+          sendError(res, new HttpError(500, "Failed to persist conversation message."), traceId);
           return;
         }
       }
@@ -624,24 +778,43 @@ export function createBackendServer(): http.Server {
         reqLogger.error("Archestra gateway configuration missing or incomplete", {
           error: errorMsg,
         });
-        sendJson(res, 500, {
-          error: errorMsg,
-        });
+        sendError(res, new HttpError(500, errorMsg, "CONFIG_ERROR"), traceId);
         return;
       }
 
       const aiStartTime = performance.now();
       const model = getBackendEnv().ARCHESTRA_MODEL || "unknown";
 
+      // Active RAG context injection
+      let effectivePrompt = validation.prompt;
+      let ragContext: RetrievedDocument[] = [];
+
+      if (validation.rag) {
+        try {
+          const queryEmbedding = await generateEmbedding(validation.prompt);
+          ragContext = await searchSimilarDocuments(queryEmbedding, 3, 0.2);
+          if (ragContext.length > 0) {
+            effectivePrompt = buildRagPrompt(validation.prompt, ragContext);
+          }
+        } catch (ragErr) {
+          reqLogger.warn("RAG retrieval failed, proceeding with original prompt", {
+            err: ragErr instanceof Error ? ragErr.message : String(ragErr),
+          });
+        }
+      }
+
       try {
         const result = await traceAsync("ai.archestra_gateway", async (span) => {
           span.setAttribute("ai.provider", "archestra");
           span.setAttribute("ai.model", model);
-          span.setAttribute("ai.prompt.length", validation.prompt.length);
+          span.setAttribute("ai.prompt.length", effectivePrompt.length);
+          if (ragContext.length > 0) {
+            span.setAttribute("ai.rag.chunks_retrieved", ragContext.length);
+          }
           if (validation.conversationId) {
             span.setAttribute("conversation.id", validation.conversationId);
           }
-          return runConnectionTest(validation.prompt);
+          return runConnectionTest(effectivePrompt);
         });
 
         const aiDurationSeconds = (performance.now() - aiStartTime) / 1000;
@@ -650,6 +823,18 @@ export function createBackendServer(): http.Server {
           aiRequestDurationSeconds.observe({ status: "success", model }, aiDurationSeconds);
         } catch {
           // Ignore metrics collection errors
+        }
+
+        // Prometheus LLM Token & Cost Tracking
+        const promptTokens =
+          result.usage?.promptTokens ?? Math.ceil(effectivePrompt.length / 4);
+        const completionTokens =
+          result.usage?.completionTokens ?? Math.ceil(result.text.length / 4);
+
+        try {
+          recordAiTokenUsage(model, promptTokens, completionTokens);
+        } catch {
+          // Suppress metrics error
         }
 
         reqLogger.info("AI connection test completed successfully");
@@ -667,6 +852,12 @@ export function createBackendServer(): http.Server {
         sendJson(res, 200, {
           result: result.text,
           ...(validation.conversationId ? { conversationId: validation.conversationId } : {}),
+          ...(ragContext.length > 0 ? { ragContext } : {}),
+          usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens: promptTokens + completionTokens,
+          },
         });
       } catch (error) {
         const aiDurationSeconds = (performance.now() - aiStartTime) / 1000;
@@ -680,15 +871,18 @@ export function createBackendServer(): http.Server {
         reqLogger.error("AI connection test failed.", {
           err: error instanceof Error ? error.message : String(error),
         });
-        sendJson(res, 502, {
-          error: "AI request failed. Check backend server logs for details.",
-        });
+        sendError(
+          res,
+          new HttpError(502, "AI request failed. Check backend server logs for details.", "AI_GATEWAY_ERROR"),
+          traceId,
+        );
       }
       return;
     }
 
     // Default 404
-    sendJson(res, 404, { error: `Not found: ${req.method} ${pathname}` });
+    sendError(res, new NotFoundError(`Not found: ${req.method} ${pathname}`), traceId);
     });
+
   });
 }

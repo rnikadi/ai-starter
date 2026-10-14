@@ -52,12 +52,23 @@ export function isArchestraConfigured(): boolean {
   }
 }
 
+export interface RunConnectionTestResult {
+  text: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+}
+
 export async function runConnectionTest(
   prompt: string,
-): Promise<{ text: string }> {
+): Promise<RunConnectionTestResult> {
   const agent = createConnectionAgent();
   const result = await agent.generate(prompt);
+  const rawUsage = (result as unknown as { usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } }).usage;
   return {
     text: result.text,
+    ...(rawUsage ? { usage: rawUsage } : {}),
   };
 }

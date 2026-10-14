@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "dev:app": "node -e \"const { spawn } = require('child_process'); spawn('pnpm', ['dev:backend'], { stdio: 'inherit', shell: true }); spawn('pnpm', ['dev:frontend'], { stdio: 'inherit', shell: true });\"",
     "dev:frontend": "cd frontend && next dev --port 3001",
     "dev:backend": "cd backend && tsx watch src/index.ts",

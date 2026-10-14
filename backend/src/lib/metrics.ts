@@ -41,6 +41,72 @@ export const aiRequestDurationSeconds = new client.Histogram({
   registers: [register],
 });
 
+export const aiTokensTotal = new client.Counter({
+  name: "ai_tokens_total",
+  help: "Total number of tokens consumed by AI LLM requests",
+  labelNames: ["model", "type"],
+  registers: [register],
+});
+
+export const aiEstimatedCostDollarsTotal = new client.Counter({
+  name: "ai_estimated_cost_dollars_total",
+  help: "Total estimated cost in USD for LLM token usage",
+  labelNames: ["model"],
+  registers: [register],
+});
+
+// Standard FinOps pricing reference per million tokens ($/1M tokens)
+const MODEL_PRICING_PER_MILLION: Record<
+  string,
+  { prompt: number; completion: number }
+> = {
+  "gpt-4o": { prompt: 2.5, completion: 10.0 },
+  "gpt-4o-mini": { prompt: 0.15, completion: 0.6 },
+  "claude-3-5-sonnet": { prompt: 3.0, completion: 15.0 },
+  "claude-3-5-haiku": { prompt: 0.8, completion: 4.0 },
+  "claude-3-haiku": { prompt: 0.25, completion: 1.25 },
+  default: { prompt: 0.5, completion: 1.5 },
+};
+
+export function calculateEstimatedCost(
+  model: string,
+  promptTokens: number,
+  completionTokens: number,
+): number {
+  const normalizedModel = Object.keys(MODEL_PRICING_PER_MILLION).find((key) =>
+    model.toLowerCase().includes(key),
+  );
+  const pricing =
+    MODEL_PRICING_PER_MILLION[normalizedModel || "default"] ??
+    MODEL_PRICING_PER_MILLION.default;
+
+  const promptCost = (promptTokens / 1_000_000) * pricing.prompt;
+  const completionCost = (completionTokens / 1_000_000) * pricing.completion;
+
+  return promptCost + completionCost;
+}
+
+export function recordAiTokenUsage(
+  model: string,
+  promptTokens: number,
+  completionTokens: number,
+): void {
+  const safePrompt = Math.max(0, Math.round(promptTokens));
+  const safeCompletion = Math.max(0, Math.round(completionTokens));
+
+  if (safePrompt > 0) {
+    aiTokensTotal.inc({ model, type: "prompt" }, safePrompt);
+  }
+  if (safeCompletion > 0) {
+    aiTokensTotal.inc({ model, type: "completion" }, safeCompletion);
+  }
+
+  const cost = calculateEstimatedCost(model, safePrompt, safeCompletion);
+  if (cost > 0) {
+    aiEstimatedCostDollarsTotal.inc({ model }, cost);
+  }
+}
+
 // 3. Database Operations Metrics
 export const dbQueryDurationSeconds = new client.Histogram({
   name: "db_query_duration_seconds",

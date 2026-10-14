@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp, index, vector } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const conversations = pgTable(
@@ -33,6 +33,23 @@ export const messages = pgTable(
   ],
 );
 
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: varchar("title", { length: 255 }).notNull(),
+    content: text("content").notNull(),
+    metadata: text("metadata"),
+    embedding: vector("embedding", { dimensions: 1536 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("documents_created_at_idx").on(table.createdAt),
+    index("documents_title_idx").on(table.title),
+  ],
+);
+
 export const conversationsRelations = relations(conversations, ({ many }) => ({
   messages: many(messages),
 }));
@@ -48,4 +65,5 @@ export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
-
+export type Document = typeof documents.$inferSelect;
+export type NewDocument = typeof documents.$inferInsert;

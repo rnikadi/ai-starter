@@ -7,6 +7,7 @@ export type AiTestRequestValidation =
       success: true;
       prompt: string;
       conversationId?: string;
+      rag?: boolean;
     }
   | {
       success: false;
@@ -32,6 +33,7 @@ export const aiTestRequestSchema = z.object({
         'The "conversationId" field must be a non-empty string when provided.',
     })
     .optional(),
+  rag: z.boolean().optional(),
 });
 
 export const createConversationSchema = z.object({
@@ -108,5 +110,6 @@ export function validateAiTestRequest(
     ...(result.data.conversationId
       ? { conversationId: result.data.conversationId }
       : {}),
+    ...(result.data.rag !== undefined ? { rag: result.data.rag } : {}),
   };
 }

@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { authenticateRequest, type AuthenticatedUser } from "./auth.js";
+import { sendError, UnauthorizedError, ForbiddenError } from "../lib/errors.js";
 
 export function hasRole(user: AuthenticatedUser, role: string): boolean {
   return Array.isArray(user.roles) && user.roles.includes(role);
@@ -26,12 +27,7 @@ export async function guardAuth(
   const auth = await authenticateRequest(req);
 
   if (!auth.authenticated || !auth.user) {
-    res.writeHead(401, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        error: auth.error ?? "Authentication is required.",
-      }),
-    );
+    sendError(res, new UnauthorizedError(auth.error ?? "Authentication is required."));
     return null;
   }
 
@@ -44,14 +40,13 @@ export function guardRoles(
   allowedRoles: string[],
 ): boolean {
   if (!hasAnyRole(user, allowedRoles)) {
-    res.writeHead(403, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        error: `Forbidden: Requires one of [${allowedRoles.join(", ")}] roles.`,
-      }),
+    sendError(
+      res,
+      new ForbiddenError(
+        `Forbidden: Requires one of [${allowedRoles.join(", ")}] roles.`,
+      ),
     );
     return false;
   }
   return true;
 }
-

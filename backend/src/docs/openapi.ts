@@ -288,6 +288,182 @@ export const openapiSpec = {
         },
       },
     },
+    "/api/documents": {
+      get: {
+        summary: "List knowledge base documents",
+        description: "Returns all documents stored in the pgvector knowledge base.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "List of documents",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    documents: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/DocumentItem" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      post: {
+        summary: "Create knowledge base document",
+        description:
+          "Generates a 1536-dimensional vector embedding and stores document in PostgreSQL with pgvector. Requires developer or admin role.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["title", "content"],
+                properties: {
+                  title: { type: "string", example: "Kubernetes Autoscaling Guide" },
+                  content: { type: "string", example: "Detailed cluster autoscaling documentation..." },
+                  metadata: { type: "string", example: '{"category":"devops"}' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Document created",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    document: { $ref: "#/components/schemas/DocumentItem" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/api/documents/{id}": {
+      get: {
+        summary: "Get knowledge base document",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Document details",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    document: { $ref: "#/components/schemas/DocumentItem" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        summary: "Delete knowledge base document",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Document deleted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { success: { type: "boolean" } },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/api/rag/search": {
+      post: {
+        summary: "Vector similarity search",
+        description: "Executes cosine distance vector search over pgvector embeddings.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["query"],
+                properties: {
+                  query: { type: "string", example: "How does Loki scrape application logs?" },
+                  limit: { type: "number", default: 5 },
+                  threshold: { type: "number", default: 0.0 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Top matching documents with cosine similarity scores",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    results: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", format: "uuid" },
+                          title: { type: "string" },
+                          content: { type: "string" },
+                          similarity: { type: "number", example: 0.884 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -429,11 +605,27 @@ export const openapiSpec = {
           },
         },
       },
+      DocumentItem: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          title: { type: "string", example: "Microservices Architecture" },
+          content: { type: "string", example: "Detailed documentation content..." },
+          metadata: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
       ErrorResponse: {
         type: "object",
         properties: {
           error: { type: "string" },
+          code: { type: "string", example: "BAD_REQUEST" },
+          statusCode: { type: "number", example: 400 },
+          traceId: { type: "string", example: "4bf92f3577b34da6a3ce929d0e0e4736" },
+          details: { type: "object" },
         },
+        required: ["error"],
       },
     },
     responses: {

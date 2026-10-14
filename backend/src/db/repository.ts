@@ -1,6 +1,6 @@
-import { desc, eq, and, sql } from "drizzle-orm";
+import { desc, eq, and, sql, cosineDistance } from "drizzle-orm";
 import { getDb } from "./index.js";
-import { conversations, messages } from "./schema.js";
+import { conversations, messages, documents } from "./schema.js";
 import { traceAsync } from "../lib/tracing.js";
 
 export async function createConversation(userId: string, title: string) {
@@ -154,6 +154,110 @@ export async function clearAllConversations() {
     await db.delete(messages);
     await db.delete(conversations);
     return { success: true };
+  });
+}
+
+export async function createDocument(data: {
+  title: string;
+  content: string;
+  metadata?: string;
+  embedding?: number[];
+}) {
+  return traceAsync("db.createDocument", async (span) => {
+    span.setAttribute("db.system", "postgresql");
+    span.setAttribute("db.operation", "INSERT");
+    span.setAttribute("document.title", data.title);
+    const db = getDb();
+    const [doc] = await db
+      .insert(documents)
+      .values({
+        title: data.title,
+        content: data.content,
+        metadata: data.metadata,
+        embedding: data.embedding,
+      })
+      .returning();
+    return doc;
+  });
+}
+
+export async function listDocuments(limit = 50) {
+  return traceAsync("db.listDocuments", async (span) => {
+    span.setAttribute("db.system", "postgresql");
+    span.setAttribute("db.operation", "SELECT");
+    const db = getDb();
+    return db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        metadata: documents.metadata,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt,
+      })
+      .from(documents)
+      .orderBy(desc(documents.createdAt))
+      .limit(limit);
+  });
+}
+
+export async function getDocumentById(id: string) {
+  return traceAsync("db.getDocumentById", async (span) => {
+    span.setAttribute("db.system", "postgresql");
+    span.setAttribute("db.operation", "SELECT");
+    span.setAttribute("document.id", id);
+    const db = getDb();
+    const [doc] = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.id, id));
+    return doc || null;
+  });
+}
+
+export async function deleteDocument(id: string) {
+  return traceAsync("db.deleteDocument", async (span) => {
+    span.setAttribute("db.system", "postgresql");
+    span.setAttribute("db.operation", "DELETE");
+    span.setAttribute("document.id", id);
+    const db = getDb();
+    const [deleted] = await db
+      .delete(documents)
+      .where(eq(documents.id, id))
+      .returning();
+    return Boolean(deleted);
+  });
+}
+
+export async function searchSimilarDocuments(
+  queryEmbedding: number[],
+  limit = 5,
+  threshold = 0.0,
+) {
+  return traceAsync("db.searchSimilarDocuments", async (span) => {
+    span.setAttribute("db.system", "postgresql");
+    span.setAttribute("db.operation", "SELECT_VECTOR_SEARCH");
+    span.setAttribute("vector.dimensions", queryEmbedding.length);
+    const db = getDb();
+
+    // Cosine similarity: 1 - cosine distance
+    const similarity = sql<number>`1 - (${cosineDistance(documents.embedding, queryEmbedding)})`;
+
+    const results = await db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        content: documents.content,
+        metadata: documents.metadata,
+        similarity,
+      })
+      .from(documents)
+      .where(
+        sql`${documents.embedding} IS NOT NULL AND (1 - (${cosineDistance(documents.embedding, queryEmbedding)})) >= ${threshold}`,
+      )
+      .orderBy(desc(similarity))
+      .limit(limit);
+
+    return results;
   });
 }
 

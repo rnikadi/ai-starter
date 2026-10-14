@@ -18,6 +18,10 @@ import {
   addConversationMessage,
   deleteConversation,
   updateConversationTitle,
+  createDocument,
+  listDocuments,
+  deleteDocument,
+  searchSimilarDocuments,
 } from "./repository.js";
 
 describe("Database Conversation Repository", () => {
@@ -130,6 +134,86 @@ describe("Database Conversation Repository", () => {
     const result = await updateConversationTitle("conv-1", "user-1", "New Title");
     expect(result).toEqual(mockUpdated);
     expect(mockDb.update).toHaveBeenCalled();
+  });
+
+  describe("Document Knowledge Base & Vector Search", () => {
+    it("creates a document with content and embedding", async () => {
+      const mockDoc = {
+        id: "doc-123",
+        title: "Architecture",
+        content: "Microservices with Prometheus",
+        metadata: JSON.stringify({ category: "infra" }),
+        embedding: [0.1, 0.2],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockDb.insert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([mockDoc]),
+        }),
+      });
+
+      const result = await createDocument({
+        title: "Architecture",
+        content: "Microservices with Prometheus",
+        metadata: JSON.stringify({ category: "infra" }),
+        embedding: [0.1, 0.2],
+      });
+
+      expect(result).toEqual(mockDoc);
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
+
+    it("lists documents with limit", async () => {
+      const mockDocs = [{ id: "doc-1", title: "Doc 1" }];
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(mockDocs),
+          }),
+        }),
+      });
+
+      const result = await listDocuments(10);
+      expect(result).toEqual(mockDocs);
+    });
+
+    it("deletes a document and returns true if deleted", async () => {
+      mockDb.delete.mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: "doc-1" }]),
+        }),
+      });
+
+      const result = await deleteDocument("doc-1");
+      expect(result).toBe(true);
+    });
+
+    it("searches similar documents using vector similarity", async () => {
+      const mockMatches = [
+        {
+          id: "doc-1",
+          title: "Doc 1",
+          content: "Content 1",
+          metadata: null,
+          similarity: 0.92,
+        },
+      ];
+
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue(mockMatches),
+            }),
+          }),
+        }),
+      });
+
+      const result = await searchSimilarDocuments([0.1, 0.2], 3, 0.5);
+      expect(result).toEqual(mockMatches);
+    });
   });
 });
 
