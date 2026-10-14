@@ -197,16 +197,11 @@ services:
     volumes:
       - ./monitoring/tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml:ro
       - tempo-data:/tmp/tempo
-    healthcheck:
-      test: ["CMD", "/tempo", "--health"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
 
   grafana:
     image: grafana/grafana:11.4.0
     container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-grafana
+    user: "0"
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -230,7 +225,7 @@ services:
       prometheus:
         condition: service_started
       tempo:
-        condition: service_healthy
+        condition: service_started
 
 volumes:
   postgres-data:
