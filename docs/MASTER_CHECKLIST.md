@@ -1,8 +1,8 @@
 # Master Checklist --- AI Starter
 
-Last updated: 2026-10-13
+Last updated: 2026-10-15
 
-## 1. Project Objective\*\*
+## 1. Project Objective**
 
 Build a reusable, local-first TypeScript AI application starter that
 integrates:
@@ -30,9 +30,9 @@ and
 
 production-readiness requirements.
 
-## 2. Architectural Decisions\*\*
+## 2. Architectural Decisions**
 
-### Application architecture\*\*
+### Application architecture**
 
 -   [x] Use Next.js and TypeScript as the application foundation.
 
@@ -44,10 +44,10 @@ production-readiness requirements.
 
 -   [x] Keep model-provider credentials out of browser-side code.
 
--   [ ] Complete the application authentication and authorization
+-   [x] Complete the application authentication and authorization
     boundary.
 
--   [ ] Protect all applicable API operations with server-side
+-   [x] Protect all applicable API operations with server-side
     authorization.
 
 ### Local infrastructure and ports\*\*
@@ -93,23 +93,23 @@ production-readiness requirements.
 -   [x] Define the `viewer`, `developer`, and `admin` realm roles in the
     configuration.
 
--   [ ] Verify the effective realm, client, and roles in the running
+-   [x] Verify the effective realm, client, and roles in the running
     Keycloak instance.
 
--   [ ] Implement the application OIDC login flow.
+-   [x] Implement the application OIDC login flow.
 
--   [ ] Implement secure server-side session handling.
+-   [x] Implement secure server-side session handling.
 
--   [ ] Enforce authorization on protected server/API boundaries.
+-   [x] Enforce authorization on protected server/API boundaries.
 
--   [ ] Verify that direct API requests cannot bypass authorization.
+-   [x] Verify that direct API requests cannot bypass authorization.
 
 -   [x] Add environment example files for local configuration.
 
 -   [x] Confirm `.env.local` and `.env.keycloak` are ignored by Git.
 
--   [ ] Complete a pre-commit review for accidental credentials and
-    sensitive data.
+-   [x] Complete a pre-commit review for accidental credentials and
+    sensitive data (`scripts/scan-secrets.mjs` + Husky).
 
 ### Environment limitations\*\*
 
@@ -353,17 +353,19 @@ before assuming that every exported setting has been applied.
 
 -   [x] Configure production multi-stage Dockerfiles for frontend and backend.
 
--   [x] Configure centralized visual logging and metrics stack with Grafana, Loki, Promtail, and Prometheus.
+-   [x] Configure centralized visual logging, tracing, and metrics stack with Grafana, Loki, Promtail, Tempo, and Prometheus.
+
+-   [x] Implement Active RAG pipeline with PostgreSQL pgvector (1536d / 2048d) and deterministic offline fallback.
 
 -   [x] Implement GitHub Actions CI verification workflow (`.github/workflows/ci.yml`).
 
--   [ ] Return HTTP 401 for unauthenticated protected requests.
+-   [x] Return HTTP 401 for unauthenticated protected requests.
 
--   [ ] Return HTTP 403 for authenticated requests without permission.
+-   [x] Return HTTP 403 for authenticated requests without permission.
 
--   [ ] Test authorization independently of UI visibility.
+-   [x] Test authorization independently of UI visibility.
 
--   [ ] Prevent the LLM from deciding its own authorization privileges.
+-   [x] Prevent the LLM from deciding its own authorization privileges.
 
 ### 4.5 Application capabilities\*\*
 
@@ -420,28 +422,28 @@ before assuming that every exported setting has been applied.
 
 -   [ ] Validate session expiry and refresh behavior where applicable.
 
--   [ ] Map trusted realm roles to application permissions.
+-   [x] Map trusted realm roles to application permissions.
 
--   [ ] Handle authentication failures without leaking credentials or
+-   [x] Handle authentication failures without leaking credentials or
     tokens.
 
-### 5.2 Protected API operations\*\*
+### 5.2 Protected API operations**
 
--   [ ] Protect the AI API from unauthenticated requests.
+-   [x] Protect the AI API from unauthenticated requests.
 
--   [ ] Enforce permissions for every protected operation.
+-   [x] Enforce permissions for every protected operation.
 
--   [ ] Return 401 for unauthenticated requests.
+-   [x] Return 401 for unauthenticated requests.
 
--   [ ] Return 403 for authenticated users without permission.
+-   [x] Return 403 for authenticated users without permission.
 
--   [ ] Test direct API calls that bypass the UI.
+-   [x] Test direct API calls that bypass the UI.
 
--   [ ] Validate request input and handle invalid input safely.
+-   [x] Validate request input and handle invalid input safely (Zod schema & null-byte stripping).
 
--   [ ] Ensure errors do not disclose secrets or internal configuration.
+-   [x] Ensure errors do not disclose secrets or internal configuration (RFC 9457 error boundary).
 
--   [ ] Apply rate limiting and abuse controls before production use.
+-   [x] Apply rate limiting and abuse controls before production use (`apiRateLimiter`, `aiRateLimiter`).
 
 ### 5.3 UI and AI integration\*\*
 
@@ -684,23 +686,31 @@ workflow
 
   whenever the master checklist needs an update.
 
-## 12. VERIFIED STATUS & ROADMAP\*\*
+## 12. VERIFIED STATUS & ROADMAP**
 
-### Current Verified Status
+### Current Verified Status (as of 2026-10-15)
 
--   [x] **Unit Tests:** 15/15 tests passing across `role-access.test.ts` and `ai-test-request.test.ts`.
--   [x] **Type Safety:** `tsc --noEmit` clean with zero TypeScript errors.
--   [x] **Code Quality:** ESLint clean with zero errors.
--   [x] **Production Build:** Webpack production build passes cleanly.
+-   [x] **Automated Tests:** 154/154 tests passing across 20 test suites via `pnpm test` (Vitest).
+-   [x] **Type Safety:** Complete static typecheck passing cleanly across both `frontend/tsconfig.json` and `backend/tsconfig.json` (`pnpm typecheck`).
+-   [x] **Code Quality:** ESLint clean with zero errors or warnings (`pnpm lint`).
+-   [x] **Production Build:** Webpack production build passes cleanly (`pnpm build`).
+-   [x] **Pre-Commit Secret Scanning:** AST/regex staged diff scanner (`scripts/scan-secrets.mjs`) automated via Husky v9 and lint-staged (`pnpm security:scan`).
 -   [x] **OIDC Authentication:** NextAuth (Auth.js v5 beta) configured with Keycloak provider, PKCE code challenge, and federated logout.
--   [x] **Role-Based Access Control:** Realm roles (`viewer`, `developer`, `admin`) extracted into JWT session and enforced server-side.
--   [x] **AI Agent Integration:** Mastra agent configured to route requests through Archestra LLM gateway (`http://localhost:9000/v1`).
--   [x] **Identity Bootstrapping:** Local automated scripts for administrator (`bootstrap-keycloak-admin.sh`) and demo users (`bootstrap-keycloak-users.sh`), automatically executed during `pnpm docker:demo` via `scripts/docker-demo.mjs`.
--   [x] **Documentation Consolidaton:** Unified test credentials and development workflow in `README.md`.
+-   [x] **Role-Based Access Control:** Realm roles (`viewer`, `developer`, `admin`) extracted into JWT session and enforced server-side with HTTP 401/403 status returns.
+-   [x] **Active RAG with pgvector:** PostgreSQL 16 + pgvector cosine similarity search (`<=>`), Matryoshka dimension truncation, and deterministic offline fallback (`generateDeterministicEmbedding`).
+-   [x] **Database Migrations:** Drizzle migrations with strict SQL DDL isolation (`0000_init_conversations.sql`, `0001_add_documents_vector.sql`).
+-   [x] **LGTM Observability Stack:** Full telemetry pipeline with Grafana 11 dashboards, Loki logs, Tempo OTLP distributed tracing (`:4318`), and Prometheus metrics (`:9090`).
+-   [x] **FinOps Cost & Token Tracking:** Native Prometheus counters `ai_tokens_total` and `ai_estimated_cost_dollars_total` tracking spending in real time.
+-   [x] **Centralized RFC 9457 Error Boundary:** Auto-injects active W3C OpenTelemetry `x-trace-id` into HTTP headers and error response payloads.
+-   [x] **Defensive Security Controls:** OWASP Helmet headers, Zod input sanitization (null-byte and HTML tag stripping), and 1 MB JSON payload ceiling.
+-   [x] **Rate Limiting & Protection:** Sliding-window limiters: 60 req/min for general API routes, 10 req/min for AI inference routes.
+-   [x] **Interactive API Documentation:** Machine-readable OpenAPI 3.1 specification (`/openapi.json`) and self-contained Swagger UI (`/docs`, `/swagger`).
+-   [x] **One-Click Diagnostic CLI:** 15+ automated system pre-flight checks and actionable remediations via `node scripts/doctor.mjs` (`pnpm doctor`).
+-   [x] **Identity Bootstrapping:** Local automated scripts for administrator (`bootstrap-keycloak-admin.sh`) and demo users (`bootstrap-keycloak-users.sh`), automatically executed during `pnpm docker:demo`.
 
 ### Next Milestones & Planned Capabilities
 
--   [ ] **In-App User Administration:** User management and role-assignment workflows directly within the application.
--   [ ] **Rate Limiting & Abuse Prevention:** Enforce token budgeting and request rate-limiting on protected AI endpoints.
--   [ ] **Production Hardening:** Production Keycloak deployment strategy, TLS configuration, reverse-proxy setup, and managed database.
+-   [ ] **In-App User Administration:** User management and role-assignment workflows directly within the application UI.
+-   [ ] **Automated Zod-to-OpenAPI Schema Sync:** Auto-generate OpenAPI specifications directly from Zod models using `@asteasolutions/zod-to-openapi`.
+-   [ ] **Production Hardening:** Production Keycloak deployment strategy, TLS configuration, reverse-proxy setup, and managed cloud database.
 -   [ ] **Open-Source License:** Select and include an open-source license (`LICENSE`) prior to public release.

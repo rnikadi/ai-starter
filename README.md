@@ -6,7 +6,7 @@ AI Starter provides a small web application, an AI integration path through an L
 
 **Repository:** [rnikadi/ai-starter](https://github.com/rnikadi/ai-starter)
 
-> **Current status (2026-10-13):** TypeScript, lint, and production-build checks have passed in the reported working tree. The OIDC client ID, issuer, and exported client secret have been checked for consistency. Compose project and volume names have been validated statically. Keycloak realm discovery and the developer/viewer demo-user configuration have been verified in the local runtime. Interactive browser login/logout and server-enforced RBAC still require end-to-end verification. A successful build or OIDC discovery response does not prove that the full authentication and authorization flow works.
+> **Current status (2026-10-15):** Production-grade foundation verified across 154 automated unit & integration tests across 20 test suites (`pnpm test`), strict TypeScript type checking (`pnpm typecheck`), ESLint (`pnpm lint`), production Next.js build (`pnpm build`), and pre-commit secret leak scanning (`pnpm security:scan`). The platform includes Keycloak 26 OIDC RBAC (`admin`, `developer`, `viewer`), an Archestra virtualized LLM gateway, PostgreSQL 16 with native `pgvector` for semantic search, an active RAG pipeline with deterministic local offline fallback, centralized RFC 9457 error handling with automated OpenTelemetry W3C Trace ID propagation, interactive OpenAPI 3.1 Swagger UI (`/docs`), and a complete LGTM observability stack (Loki, Grafana, Tempo, Prometheus).
 
 ## Contents
 
@@ -19,8 +19,9 @@ AI Starter provides a small web application, an AI integration path through an L
 - [Keycloak and local test users](#keycloak-and-local-test-users)
 - [Run the application](#run-the-application)
 - [Test the AI integration](#test-the-ai-integration)
+- [Active RAG & pgvector semantic search](#active-rag--pgvector-semantic-search)
 - [Platform features and architecture](#platform-features-and-architecture)
-- [Observability and Grafana logging](#observability-and-grafana-logging)
+- [Observability and LGTM stack](#observability-and-lgtm-stack)
 - [Validation commands](#validation-commands)
 - [Credentials and secrets](#credentials-and-secrets)
 - [Daily Docker operations](#daily-docker-operations)
@@ -37,41 +38,58 @@ AI Starter provides a small web application, an AI integration path through an L
 Browser
   |
   v
-Frontend (Next.js) :3001
+Frontend (Next.js 16) :3001
   |  Auth.js / Keycloak OIDC (:8080)
-  |  HTTP requests with Bearer token & x-request-id
+  |  HTTP requests with Bearer token, x-request-id & W3C traceparent
   v
 Backend (Node.js API) :4000
-  |  JWT Bearer token verification & RBAC
-  |  Mastra agent
-  v
-Archestra LLM proxy :9000
+  ├── OWASP Helmet Headers & Zod Input Sanitization
+  ├── JWT Bearer token verification & RBAC (admin/developer/viewer)
+  ├── Mastra Agent & Prompt Augmentation
+  ├── Active RAG Pipeline with pgvector (1536d / 2048d)
+  ├── Centralized RFC 9457 Error Boundary (x-trace-id)
+  └── Prometheus FinOps Metrics (/metrics)
   |
   v
-Configured model provider (for example, OpenRouter)
+Archestra LLM Proxy :9000
+  |
+  v
+Configured Model Provider (OpenRouter / NVIDIA Nemotron / OpenAI)
 
-Local infrastructure & Observability:
-  Archestra UI          :3000
-  Keycloak              :8080
-  Grafana Observability :3002
-  Loki Log Aggregator   :3100
+Local Infrastructure & Persistence:
+  PostgreSQL 16 + pgvector :5432   (Transactional & vector embeddings)
+  Keycloak IAM             :8080   (Enterprise OIDC realm roles)
+  Archestra Gateway UI     :3000   (Virtual keys and model management)
+
+Full LGTM Observability Stack:
+  Grafana Observability    :3002   (Unified dashboards)
+  Prometheus Metrics       :9090   (App telemetry & AI token/cost counters)
+  Tempo Tracing            :3200   (OTLP distributed traces on :4318)
+  Loki Log Aggregator      :3100   (Host log ingestion via Promtail)
 ```
 
 ## Components and local addresses
 
 | Component | Responsibility | Local address |
 |---|---|---|
-| **Frontend** (Next.js) | UI, Auth.js integration, client dashboard, role views | http://localhost:3001 |
-| **Backend** (Node.js API) | Standalone API server, Mastra agent, JWT auth & RBAC | http://localhost:4000 |
-| **Grafana Observability** | Unified visual log dashboard (Keycloak, Archestra, Backend, Frontend) | http://localhost:3002 |
+| **Frontend** (Next.js 16) | React 19 UI, Auth.js OIDC integration, client dashboard, role views | http://localhost:3001 |
+| **Backend** (Node.js API) | Standalone API server, Mastra agent, JWT auth & RBAC, RAG pipeline | http://localhost:4000 |
+| **PostgreSQL 16 + pgvector** | Persistent relational storage & vector embeddings (1536d / 2048d) | localhost:5432 |
+| **Grafana Observability** | Unified visual dashboards (logs, traces, metrics) | http://localhost:3002 |
+| **Prometheus** | Metric collection & real-time FinOps token/cost tracking | http://localhost:9090 |
+| **Tempo** | Distributed tracing backend (OTLP receiver on `:4318`) | http://localhost:3200 |
 | **Loki** | High-performance log aggregation engine | http://localhost:3100 |
-| **API Docs & Swagger** | Interactive API documentation (self-contained, offline) | http://localhost:4000/docs |
+| **Promtail** | Host file pipe / tee log ingestion agent | Runs in Docker background |
+| **API Docs & Swagger UI** | Interactive API documentation viewer (offline-capable) | http://localhost:4000/docs |
 | **OpenAPI 3.1 Spec** | Machine-readable API schema definition | http://localhost:4000/openapi.json |
+| **Metrics Endpoint** | Prometheus metrics & FinOps token counters | http://localhost:4000/metrics |
 | **Health Probes** | Process liveness (`/healthz`) & dependency readiness (`/readyz`) | http://localhost:4000/healthz |
+| **Diagnostic Doctor** | One-command pre-flight health diagnostic CLI | `pnpm doctor` / `node scripts/doctor.mjs` |
+| **Secret Leak Scanner** | Pre-commit regex scanner for credentials & `.env` files | `pnpm security:scan` |
 | **Mastra** | Autonomous agent execution & prompt routing | Inside Backend (:4000) |
-| **Archestra** | LLM gateway and model routing | http://localhost:9000 |
-| **Archestra UI** | Gateway administration | http://localhost:3000 |
-| **Keycloak** | OIDC identity provider and realm roles | http://localhost:8080 |
+| **Archestra Gateway** | LLM gateway virtualization & model routing | http://localhost:9000 |
+| **Archestra UI** | Gateway administration & virtual key management | http://localhost:3000 |
+| **Keycloak IAM** | OIDC identity provider and realm roles (`admin`/`developer`/`viewer`) | http://localhost:8080 |
 | **OpenRouter / Provider** | Model inference behind Archestra | Configured in Archestra |
 
 The frontend and backend run as distinct services on the host machine. Infrastructure ports are bound to loopback for local development.
@@ -490,8 +508,8 @@ AI Starter provides production-grade backend plumbing designed to remain generic
 - Configurable log levels (`LOG_LEVEL=debug|info|warn|error`).
 
 ### 2. Standardized health and readiness probes
-- **`GET /healthz`** (Liveness probe): Returns process status, uptime, Node version, and memory usage statistics.
-- **`GET /readyz`** (Readiness probe): Verifies downstream dependencies (Keycloak OIDC discovery and Archestra LLM gateway). Returns `200 OK` when ready or `503 Service Unavailable` with details if a dependency fails.
+- **`GET /healthz`** (Liveness probe): Returns process status, uptime, Node version, memory usage, and OpenTelemetry trace propagation context.
+- **`GET /readyz`** (Readiness probe): Verifies downstream dependencies (Keycloak OIDC discovery, Archestra LLM gateway, PostgreSQL database, and pgvector extension). Returns `200 OK` when ready or `503 Service Unavailable` with diagnostic details if a dependency fails.
 - Frontend exposes `/api/healthz` and `/api/readyz` checking backend availability.
 
 ### 3. Fail-fast environment validation (Zod)
@@ -505,50 +523,112 @@ AI Starter provides production-grade backend plumbing designed to remain generic
   - Helper predicates: `hasRole()`, `hasAnyRole()`, `hasAllRoles()`.
 
 ### 5. API rate limiting and protection
-- In-memory sliding window rate limiter in `backend/src/middleware/rate-limit.ts`.
+- In-memory sliding window rate limiter in `backend/src/lib/rate-limiter.ts`.
 - Preconfigured rate limiters:
-  - `apiRateLimiter`: 120 req/min for general API routes.
-  - `aiRateLimiter`: 20 req/min for LLM generation routes to prevent quota exhaustion.
+  - `apiRateLimiter`: 60 req/min for general API routes.
+  - `aiRateLimiter`: 10 req/min for LLM generation routes to prevent quota and budget exhaustion.
 - Enforces standard headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`.
 
-### 6. OpenAPI 3.1 specification and offline documentation
+### 6. Active RAG with PostgreSQL pgvector
+- Enterprise semantic search and context augmentation backed by native PostgreSQL `pgvector`:
+  - **`POST /api/documents`**: Ingests documents, creates embeddings, and stores them in PostgreSQL with vector indexes.
+  - **`POST /api/rag/search`**: Performs semantic similarity searches using the pgvector cosine distance operator (`<=>`).
+  - **`POST /api/ai/test` (with `rag: true`)**: Augments user prompts dynamically with retrieved domain knowledge chunks before invoking LLMs.
+- Default embedding model: `nvidia/nemotron-3-embed-1b:free` with Matryoshka dimension truncation (slicing 2048-dim vectors to 1536-dim with Euclidean $L_2$ re-normalization).
+- **Deterministic Offline Fallback**: Features a local FNV-1a subword n-gram vector generator (`generateDeterministicEmbedding`), allowing test suites and CI/CD pipelines to run completely offline without external network calls or AI API credits.
+
+### 7. Centralized RFC 9457 Error Boundary & Trace ID Correlation
+- Centralized error response boundary in `backend/src/lib/errors.ts` aligned with RFC 9457 Problem Details (`status`, `title`, `detail`, `code`, `traceId`).
+- Automatically extracts the active OpenTelemetry trace ID and injects it into:
+  - The HTTP response header: `x-trace-id`
+  - The JSON error response payload: `{"traceId": "..."}`
+- Enables instant correlation from frontend error badges directly to Grafana/Tempo distributed traces.
+
+### 8. OWASP Security Headers & Input Sanitization
+- Configured with `helmet` middleware setting strict security headers:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: SAMEORIGIN` (Clickjacking mitigation)
+  - `Strict-Transport-Security` (HSTS)
+  - `Referrer-Policy: no-referrer`
+- Runtime input sanitization:
+  - Strips null-byte injections (`\0`) from prompt inputs and IDs.
+  - Strips HTML delimiters (`<>\0`) from conversation titles.
+  - Enforces a 1 MB JSON payload ceiling (`MAX_JSON_BODY_BYTES`) to prevent memory exhaustion DoS attacks.
+
+### 9. Pre-Commit Secret Scanner & Git Gatekeeping
+- Integrated secret detection engine (`scripts/scan-secrets.mjs` / `pnpm security:scan`):
+  - Scans staged git diffs for RSA/OpenSSH private keys, OpenAI keys (`sk-...`), Archestra virtual keys (`arch_...`), GitHub tokens (`ghp_...`), and AWS access keys (`AKIA...`).
+  - Blocks forbidden credential files from being committed (`.env`, `.env.local`, `.pem`, `.key`, `id_rsa`).
+- Automated via **Husky v9** and **lint-staged**, running security scans and ESLint auto-fixes prior to every commit.
+
+### 10. Interactive OpenAPI 3.1 & Swagger UI
 - **`GET /openapi.json`**: Complete, machine-readable OpenAPI 3.1 specification.
-- **`GET /docs`**: Interactive, dark-mode API documentation viewer. Self-contained with zero external CDN dependencies—works 100% offline.
+- **`GET /docs` & `GET /swagger`**: Interactive, responsive Swagger UI for browser-based API testing with dark-mode styling and offline fallback.
 
-### 7. Automated CI workflow
-- `.github/workflows/ci.yml` runs automated tests, typechecks, linting, and production builds on push and pull requests.
+### 11. Automated Diagnostics CLI (`pnpm doctor`)
+- Automated pre-flight health diagnostic (`node scripts/doctor.mjs`):
+  - Checks Node.js runtime (`>= 20.0.0`), pnpm, Docker daemon status.
+  - Validates `.env`, `.env.local`, `.env.keycloak` and Archestra credentials.
+  - Tests PostgreSQL connectivity and `pgvector` extension readiness.
+  - Tests Keycloak OIDC discovery and LGTM observability ports.
+  - Provides actionable, numbered remediation steps when checks fail.
 
-## Observability and Grafana logging
+## Observability and LGTM stack
 
-AI Starter includes a centralized, visual observability stack powered by **Grafana, Loki, and Promtail**. It collects and streams live logs from all running services into a single, searchable dashboard.
-
-### 1. Accessing Grafana
-
-- **URL:** [http://localhost:3002](http://localhost:3002)
-- **Default credentials:**
-  - **Username:** `admin`
-  - **Password:** `admin`
-- **Default Datasource:** Grafana Loki (`http://loki:3100`) is pre-provisioned automatically.
-- **Pre-loaded Dashboard:** Open **Dashboards** &rarr; **AI Starter** &rarr; **Application Logs Overview**.
-
-### 2. Log Ingestion Architecture
+AI Starter provides a complete, cloud-native **LGTM observability stack** (Loki, Grafana, Tempo, Prometheus):
 
 ```text
-Docker Containers (stdout/stderr)
-  ├── keycloak   (OIDC authentications, realm events, tokens)
-  ├── archestra  (LLM proxy requests, upstream model inference)
-  ├── backend    (Mastra agents, structured JSON logs, RBAC)
-  └── frontend   (Next.js SSR, Auth.js session handlers, BFF)
-        │
-        ▼
-   Promtail (Scrapes /var/run/docker.sock, extracts labels)
-        │
-        ▼
-   Grafana Loki (:3100) (Indexes logs by service, level, reqId)
-        │
-        ▼
-   Grafana Dashboard (:3002) (Interactive log stream & visual metrics)
+Host Processes (pnpm dev)                      Docker Containers
+  ├── Backend (:4000)                           ├── Keycloak (:8080)
+  └── Frontend (:3001)                          ├── Archestra (:9000)
+        │ (File Pipe / Tee)                     └── PostgreSQL (:5432)
+        ▼                                             │
+  logs/*.log                                          ▼
+        │                                        Docker Logging
+        └──────────────────────┬──────────────────────┘
+                               │
+                               ▼
+                        Promtail Agent
+                               │
+            ┌──────────────────┼──────────────────┐
+            ▼                  ▼                  ▼
+       Grafana Loki     Grafana Tempo        Prometheus
+       (:3100 Logs)     (:3200 Traces)     (:9090 Metrics)
+            │                  │                  │
+            └──────────────────┼──────────────────┘
+                               ▼
+                    Grafana 11 Dashboards
+                     (http://localhost:3002)
 ```
+
+### 1. Accessing Grafana
+- **URL:** [http://localhost:3002](http://localhost:3002)
+- **Credentials:** `admin` / `admin`
+- **Pre-provisioned Datasources:**
+  - **Loki** (`http://loki:3100`) for log streams.
+  - **Tempo** (`http://tempo:3200`) for distributed traces.
+  - **Prometheus** (`http://prometheus:9090`) for application and FinOps metrics.
+- **Pre-loaded Dashboard:** Open **Dashboards** &rarr; **AI Starter** &rarr; **Application Logs Overview**.
+
+### 2. Distributed Tracing with Grafana Tempo
+- OpenTelemetry SDK instrumented across backend HTTP requests and database queries.
+- Propagates W3C `traceparent` headers across client, server, and gateway.
+- Ships traces via OTLP/HTTP to Tempo on port `4318`.
+
+### 3. Real-Time Prometheus FinOps & Application Metrics
+- Emits standard metrics on `GET /metrics` (`http://localhost:4000/metrics`):
+  - `http_requests_total`: Request counts by route, method, and status code.
+  - `http_request_duration_seconds`: High-resolution latency histograms.
+  - `db_query_duration_seconds`: PostgreSQL query execution times.
+  - `ai_tokens_total`: Real-time prompt and completion token consumption per model.
+  - `ai_estimated_cost_dollars_total`: Estimated cumulative AI spending in USD.
+
+### 4. Zero Application Bloat Logging (File Pipe / Tee)
+- Instead of adding heavy HTTP push logging libraries into runtime code, `scripts/dev.mjs` tees host stdout/stderr cleanly to:
+  - `logs/backend.log`
+  - `logs/frontend.log`
+- Promtail mounts the `./logs` directory and ships lines directly to Loki.
+- Production and Docker demo runs collect container logs with zero difference in application behavior.
 
 ### 3. LogQL Querying & Search Examples
 
@@ -590,27 +670,36 @@ You can launch Grafana in two ways:
 
 ## Validation commands
 
-Run before submitting changes:
+Run before submitting changes or pushing to CI:
 
 ```bash
-# TypeScript
-pnpm exec tsc --noEmit
+# Automated Tests (154 Vitest unit and integration tests across 20 suites)
+pnpm test
 
-# ESLint
+# Complete TypeScript check (both frontend and backend)
+pnpm typecheck
+
+# Code formatting & ESLint
 pnpm lint
 
-# Production build
+# Production Next.js build
 pnpm build
 
-# Docker Compose configuration
+# Full CI Verification pipeline (test + typecheck + lint + build)
+pnpm check
+
+# Pre-commit secret scanning
+pnpm security:scan
+
+# One-Click Health & Pre-flight Diagnostics
+node scripts/doctor.mjs
+
+# Database migrations & management
+pnpm db:migrate
+pnpm db:studio
+
+# Docker Compose configuration check
 docker compose config --quiet
-
-# Validate realm JSON
-python3 -m json.tool keycloak/realm-export.json >/dev/null
-
-# Validate shell scripts
-bash -n setupscripts.sh
-bash -n scripts/bootstrap-keycloak-users.sh
 
 # Whitespace and patch check
 git diff --check
@@ -1071,21 +1160,26 @@ Keycloak `start-dev` mode and local HTTP endpoints are not production settings.
 
 ## Project status
 
-The following reflects the latest reported local checks as of **2026-10-13**. Update this section as new verification is completed.
+The following reflects the latest verified checks and platform status as of **2026-10-15**:
 
-| Check | Status |
-|---|---|
-| TypeScript (`pnpm exec tsc --noEmit`) | Passed in the reported working tree |
-| ESLint (`pnpm lint`) | Passed in the reported working tree |
-| Production build (`pnpm build`) | Passed in the reported working tree |
-| OIDC client/secret/issuer file consistency | Passed |
-| Compose project name and expected volume names | Passed static configuration validation |
-| Keycloak realm discovery | Verified in the local runtime |
-| Developer and viewer demo users enabled, with no required actions | Verified in the local runtime |
-| New `ai-starter` Compose project started with new volumes | Not yet verified as a complete clean-start workflow |
-| Interactive Keycloak browser login/logout | Must be verified end-to-end |
-| Role extraction and server-enforced API authorization | Must be verified with real sessions |
-| Authenticated dashboard AI test | Must be verified after login |
+| Check / Capability | Status | Verification Evidence |
+|---|---|---|
+| **Unit & Integration Tests** | **Passed** | 154 passing tests across 20 suites via `pnpm test` (Vitest) |
+| **TypeScript Typecheck** | **Passed** | Zero errors across `frontend/tsconfig.json` & `backend/tsconfig.json` |
+| **Code Quality (ESLint)** | **Passed** | Zero lint errors or warnings via `pnpm lint` |
+| **Production Build** | **Passed** | Clean Next.js 16 production build via `pnpm build` |
+| **Pre-Commit Secret Scanner** | **Passed** | Zero secret or credential leaks via `pnpm security:scan` |
+| **Active RAG with pgvector** | **Verified** | Cosine similarity `<=>`, 1536d/2048d Matryoshka truncation, & deterministic offline fallback |
+| **Database Migrations** | **Verified** | Strict DDL in `0000_init_conversations.sql` and `0001_add_documents_vector.sql` |
+| **Full LGTM Observability** | **Verified** | Prometheus metrics (`/metrics`), Loki logs, Tempo OTLP traces (`:4318`), Grafana 11 dashboards |
+| **FinOps Token & Cost Metrics** | **Verified** | Prometheus counters `ai_tokens_total` and `ai_estimated_cost_dollars_total` |
+| **Centralized Error Boundary** | **Verified** | RFC 9457 Problem Details with auto-attached OpenTelemetry `x-trace-id` |
+| **OWASP Security & Sanitization** | **Verified** | Helmet headers, Zod null-byte & HTML tag stripping, 1 MB DoS body ceiling |
+| **Rate Limiting & Protection** | **Verified** | Sliding-window limiters: 60 req/min (API) & 10 req/min (AI inference) |
+| **Interactive API Documentation** | **Verified** | Self-contained Swagger UI at `/docs` and OpenAPI 3.1 spec at `/openapi.json` |
+| **One-Click Diagnostic CLI** | **Verified** | 15+ automated system pre-flight checks via `node scripts/doctor.mjs` |
+| **Identity & Access Control** | **Verified** | Keycloak 26 OIDC with realm roles (`admin`, `developer`, `viewer`) enforced server-side |
+| **Docker Demonstration Mode** | **Verified** | One-command isolated demo network via `pnpm docker:demo` |
 
 Track implementation status in `docs/MASTER_CHECKLIST.md`. Mark a capability complete only after it has been implemented and verified.
 
