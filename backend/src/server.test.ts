@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createBackendServer } from "./server.js";
 import { Readable } from "node:stream";
+import { appConfig } from "./lib/app-config.js";
 
 vi.mock("./mastra/agents/connection-test-agent.js", () => ({
   isArchestraConfigured: () => true,
@@ -232,7 +233,7 @@ describe("Backend Server Endpoints", () => {
 
     const json = JSON.parse(res.body) as Record<string, unknown>;
     expect(json.status).toBe("healthy");
-    expect(json.service).toBe("ai-starter-backend");
+    expect(json.service).toBe(`${appConfig.packageName}-backend`);
     expect(json.uptimeSeconds).toBeDefined();
     expect(json.memory).toBeDefined();
     expect(res.headers["x-request-id"]).toBeDefined();

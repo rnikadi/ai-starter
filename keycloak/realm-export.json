@@ -1,7 +1,7 @@
 {
   "realm": "ai-starter",
   "enabled": true,
-  "displayName": "AI Integration Starter",
+  "displayName": "AI Starter",
   "registrationAllowed": false,
   "resetPasswordAllowed": false,
   "rememberMe": true,

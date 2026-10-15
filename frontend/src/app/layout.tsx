@@ -5,8 +5,7 @@ import { appConfig } from "@/lib/app-config";
 
 export const metadata: Metadata = {
   title: appConfig.displayName,
-  description:
-    "A reusable starter kit for building AI-powered applications.",
+  description: `AI application for ${appConfig.displayName}.`,
 };
 
 export const viewport: Viewport = {

@@ -15,6 +15,7 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import type { IncomingHttpHeaders } from "node:http";
 import { getBackendEnv, validateBackendEnv } from "../config/env.js";
+import { appConfig } from "./app-config.js";
 
 // Ensure global W3C Trace Context propagator is configured
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
@@ -24,7 +25,7 @@ let initialized = false;
 
 export function initTracing(): Tracer {
   if (initialized && provider) {
-    return trace.getTracer("ai-starter-backend", "0.1.0");
+    return trace.getTracer(`${appConfig.packageName}-backend`, "0.1.0");
   }
 
   const envValidation = validateBackendEnv(process.env);
@@ -38,7 +39,7 @@ export function initTracing(): Tracer {
     (process.env.DOCKER_TEMPO_URL ? `${process.env.DOCKER_TEMPO_URL}/v1/traces` : "http://localhost:4318/v1/traces");
 
   const resource = resourceFromAttributes({
-    "service.name": env?.OTEL_SERVICE_NAME || process.env.OTEL_SERVICE_NAME || "ai-starter-backend",
+    "service.name": env?.OTEL_SERVICE_NAME || process.env.OTEL_SERVICE_NAME || `${appConfig.packageName}-backend`,
     "service.version": "0.1.0",
     "deployment.environment": env?.NODE_ENV || process.env.NODE_ENV || "development",
   });
@@ -73,10 +74,10 @@ export function initTracing(): Tracer {
   trace.setGlobalTracerProvider(provider);
   initialized = true;
 
-  return trace.getTracer("ai-starter-backend", "0.1.0");
+  return trace.getTracer(`${appConfig.packageName}-backend`, "0.1.0");
 }
 
-export function getTracer(name = "ai-starter-backend", version = "0.1.0"): Tracer {
+export function getTracer(name = `${appConfig.packageName}-backend`, version = "0.1.0"): Tracer {
   if (!initialized) {
     return initTracing();
   }

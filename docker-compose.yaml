@@ -1,9 +1,7 @@
-name: ${COMPOSE_PROJECT_NAME:-ai-starter}
-
 services:
   archestra:
     image: archestra/platform:1.4.0-rc.36@sha256:b673affbc4f6704ba181b815ab7ce8352397ee084702742d6ee93159551bac2f
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-archestra
+    container_name: ${COMPOSE_PROJECT_NAME}-archestra
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -16,7 +14,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-keycloak
+    container_name: ${COMPOSE_PROJECT_NAME}-keycloak
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -38,7 +36,7 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-postgres
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -63,7 +61,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-backend
+    container_name: ${COMPOSE_PROJECT_NAME}-backend
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -102,7 +100,7 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-frontend
+    container_name: ${COMPOSE_PROJECT_NAME}-frontend
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -132,7 +130,7 @@ services:
   # Observability Stack (activated with profile: monitoring or full)
   loki:
     image: grafana/loki:3.3.0
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-loki
+    container_name: ${COMPOSE_PROJECT_NAME}-loki
     restart: unless-stopped
     profiles: ["full", "monitoring"]
     command: -config.file=/etc/loki/local-config.yaml
@@ -150,7 +148,7 @@ services:
 
   promtail:
     image: grafana/promtail:3.3.0
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-promtail
+    container_name: ${COMPOSE_PROJECT_NAME}-promtail
     user: "0:0"
     restart: unless-stopped
     profiles: ["full", "monitoring"]
@@ -165,7 +163,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.54.1
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-prometheus
+    container_name: ${COMPOSE_PROJECT_NAME}-prometheus
     restart: unless-stopped
     labels:
       logging: "promtail"
@@ -184,7 +182,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.6.0
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-tempo
+    container_name: ${COMPOSE_PROJECT_NAME}-tempo
     user: "0:0"
     restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo-config.yaml"]
@@ -201,7 +199,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.4.0
-    container_name: ${COMPOSE_PROJECT_NAME:-ai-starter}-grafana
+    container_name: ${COMPOSE_PROJECT_NAME}-grafana
     user: "0"
     restart: unless-stopped
     labels:
@@ -230,18 +228,22 @@ services:
 
 volumes:
   postgres-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-postgres-data
+    name: ${COMPOSE_PROJECT_NAME}-postgres-data
   app-postgres-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-app-postgres-data
+    name: ${COMPOSE_PROJECT_NAME}-app-postgres-data
   app-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-app-data
+    name: ${COMPOSE_PROJECT_NAME}-app-data
   keycloak-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-keycloak-data
+    name: ${COMPOSE_PROJECT_NAME}-keycloak-data
   loki-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-loki-data
+    name: ${COMPOSE_PROJECT_NAME}-loki-data
   prometheus-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-prometheus-data
+    name: ${COMPOSE_PROJECT_NAME}-prometheus-data
   tempo-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-tempo-data
+    name: ${COMPOSE_PROJECT_NAME}-tempo-data
   grafana-data:
-    name: ${COMPOSE_PROJECT_NAME:-ai-starter}-grafana-data
+    name: ${COMPOSE_PROJECT_NAME}-grafana-data
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}-network

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { appConfig } from "./app-config.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -24,7 +25,7 @@ export class Logger {
     const configuredLevel = (process.env.LOG_LEVEL?.toLowerCase() as LogLevel) || minLevel;
     this.levelWeight = LEVEL_WEIGHTS[configuredLevel] ?? LEVEL_WEIGHTS.info;
     this.context = {
-      service: "ai-starter-backend",
+      service: `${appConfig.packageName}-backend`,
       ...context,
     };
     this.isJson =

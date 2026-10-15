@@ -1,3 +1,5 @@
+import { appConfig } from "./app-config";
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVEL_WEIGHTS: Record<LogLevel, number> = {
@@ -22,7 +24,7 @@ export class Logger {
     const configuredLevel = (process.env.LOG_LEVEL?.toLowerCase() as LogLevel) || minLevel;
     this.levelWeight = LEVEL_WEIGHTS[configuredLevel] ?? LEVEL_WEIGHTS.info;
     this.context = {
-      service: "ai-starter-frontend",
+      service: `${appConfig.packageName}-frontend`,
       ...context,
     };
     this.isJson =

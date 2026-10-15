@@ -51,6 +51,19 @@ kc_exec "$KCADM" config credentials \
   --user "$ADMIN_USER" \
   --password "$ADMIN_PASSWORD" >/dev/null
 
+DISPLAY_NAME="$(node -p '
+  require("./package.json").name
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(p => p.toLowerCase() === "ai" ? "AI" : p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ")
+')"
+
+echo "Updating Keycloak realm display name to \"${DISPLAY_NAME}\"..."
+kc_exec "$KCADM" update "realms/${REALM}" \
+  -s "displayName=${DISPLAY_NAME}" \
+  >/dev/null
+
 echo "Looking up OIDC client..."
 
 CLIENT_JSON="$(

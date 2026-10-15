@@ -12,11 +12,16 @@ const RED = "\x1b[31m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
+import { syncKeycloak, toDisplayName } from "./sync-keycloak.mjs";
+
 const pkg = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
 process.env.COMPOSE_PROJECT_NAME =
-  process.env.COMPOSE_PROJECT_NAME || pkg.name || "ai-starter";
+  process.env.COMPOSE_PROJECT_NAME || pkg.name;
+
+// Synchronize Keycloak realm displayName with package.json
+syncKeycloak();
 
 function log(msg) {
   console.log(`${CYAN}[dev-runner]${RESET} ${msg}`);
@@ -80,8 +85,9 @@ function ensureDockerInfrastructure() {
 
 // 2. Display Service Dashboard
 function printDashboard() {
+  const displayName = toDisplayName(pkg.name);
   console.log(`${BOLD}====================================================${RESET}`);
-  console.log(`  ${BOLD}${GREEN}AI Starter Services${RESET}`);
+  console.log(`  ${BOLD}${GREEN}${displayName} Services${RESET}`);
   console.log(`${BOLD}====================================================${RESET}`);
   console.log(`  ${BOLD}Frontend Web UI:${RESET}       http://localhost:3001`);
   console.log(`  ${BOLD}Backend API:${RESET}           http://localhost:4000`);

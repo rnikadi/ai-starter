@@ -1,10 +1,11 @@
 import process from "node:process";
 import { isArchestraConfigured } from "../mastra/agents/connection-test-agent.js";
 import { getBackendEnv } from "../config/env.js";
+import { appConfig } from "./app-config.js";
 
 export interface LivenessReport {
   status: "healthy";
-  service: "ai-starter-backend";
+  service: string;
   uptimeSeconds: number;
   timestamp: string;
   node: string;
@@ -34,7 +35,7 @@ export function getLivenessReport(): LivenessReport {
   const memory = process.memoryUsage();
   return {
     status: "healthy",
-    service: "ai-starter-backend",
+    service: `${appConfig.packageName}-backend`,
     uptimeSeconds: Math.round(process.uptime() * 10) / 10,
     timestamp: new Date().toISOString(),
     node: process.version,

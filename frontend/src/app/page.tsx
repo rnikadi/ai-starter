@@ -27,7 +27,7 @@ async function HomeContent() {
             AI
           </div>
 
-          <p className="eyebrow">AI APPLICATION STARTER</p>
+          <p className="eyebrow">{appConfig.displayName.toUpperCase()}</p>
 
           <h1>{appConfig.displayName}</h1>
 
@@ -88,7 +88,7 @@ export default function Home() {
       fallback={
         <main className="page-shell">
           <section className="login-card">
-            <p className="eyebrow">AI APPLICATION STARTER</p>
+            <p className="eyebrow">{appConfig.displayName.toUpperCase()}</p>
             <h1>Loading your workspace</h1>
             <p className="muted">Checking your authentication session...</p>
           </section>

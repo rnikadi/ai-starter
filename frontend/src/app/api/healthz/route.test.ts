@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { GET } from "./route.js";
+import { appConfig } from "@/lib/app-config";
 
 describe("Frontend Health Endpoint", () => {
   it("returns healthy status and process statistics", async () => {
@@ -14,7 +15,7 @@ describe("Frontend Health Endpoint", () => {
     };
 
     expect(json.status).toBe("healthy");
-    expect(json.service).toBe("ai-starter-frontend");
+    expect(json.service).toBe(`${appConfig.packageName}-frontend`);
     expect(json.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(json.memory).toBeDefined();
     expect(json.memory.heapUsedMb).toBeGreaterThan(0);

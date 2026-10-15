@@ -16,35 +16,7 @@ if [[ -z "$PACKAGE_NAME" ]]; then
   exit 1
 fi
 
-export PACKAGE_NAME
-node <<'NODE'
-const fs = require("node:fs");
-
-const envPath = ".env";
-const packageName = process.env.PACKAGE_NAME;
-const lines = fs.existsSync(envPath)
-  ? fs.readFileSync(envPath, "utf8").split(/\r?\n/)
-  : [];
-
-const matching = lines
-  .map((line, index) => ({ line, index }))
-  .filter(({ line }) => /^\s*COMPOSE_PROJECT_NAME\s*=/.test(line));
-
-if (matching.length > 1) {
-  throw new Error("Multiple COMPOSE_PROJECT_NAME entries found in .env");
-}
-
-if (matching.length === 1) {
-  lines[matching[0].index] = `COMPOSE_PROJECT_NAME=${packageName}`;
-} else {
-  while (lines.length && lines[lines.length - 1] === "") lines.pop();
-  lines.push(`COMPOSE_PROJECT_NAME=${packageName}`);
-}
-
-fs.writeFileSync(envPath, lines.join("\n") + "\n", { mode: 0o600 });
-NODE
-
-echo "Docker Compose project name: ${PACKAGE_NAME}"
+echo "Project name: ${PACKAGE_NAME}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "ERROR: Docker is required. Install Docker Desktop first." >&2
@@ -91,6 +63,9 @@ ln -sf ../.env.local frontend/.env.local 2>/dev/null || true
 ln -sf ../.env frontend/.env 2>/dev/null || true
 ln -sf ../.env.local backend/.env.local 2>/dev/null || true
 ln -sf ../.env backend/.env 2>/dev/null || true
+
+# Synchronize Keycloak realm export with package.json name
+node scripts/sync-keycloak.mjs
 
 echo
 echo "Setup preparation complete."

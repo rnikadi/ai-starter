@@ -179,15 +179,18 @@ if (archestraKey && archestraBase) {
 // 3. Docker Containers Status (if Docker is running)
 if (dockerRunning) {
   console.log(`\n${BOLD}3. Container Infrastructure Status:${RESET}`);
+  const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const projectName = pkg.name || process.env.COMPOSE_PROJECT_NAME;
+
   const targetContainers = [
-    { name: "ai-starter-postgres", critical: true },
-    { name: "ai-starter-keycloak", critical: true },
-    { name: "ai-starter-archestra", critical: true },
-    { name: "ai-starter-prometheus", critical: false },
-    { name: "ai-starter-loki", critical: false },
-    { name: "ai-starter-tempo", critical: false },
-    { name: "ai-starter-grafana", critical: false },
-    { name: "ai-starter-promtail", critical: false },
+    { name: `${projectName}-postgres`, critical: true },
+    { name: `${projectName}-keycloak`, critical: true },
+    { name: `${projectName}-archestra`, critical: true },
+    { name: `${projectName}-prometheus`, critical: false },
+    { name: `${projectName}-loki`, critical: false },
+    { name: `${projectName}-tempo`, critical: false },
+    { name: `${projectName}-grafana`, critical: false },
+    { name: `${projectName}-promtail`, critical: false },
   ];
 
   try {

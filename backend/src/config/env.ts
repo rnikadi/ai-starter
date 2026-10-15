@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { appConfig } from "../lib/app-config.js";
 
 export const backendEnvSchema = z.object({
   BACKEND_PORT: z.coerce.number().default(4000),
@@ -18,7 +19,7 @@ export const backendEnvSchema = z.object({
   BACKEND_PUBLIC_URL: z.string().url().optional(),
   CORS_ALLOWED_ORIGINS: z.string().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
-  OTEL_SERVICE_NAME: z.string().default("ai-starter-backend"),
+  OTEL_SERVICE_NAME: z.string().default(`${appConfig.packageName}-backend`),
   OTEL_TRACING_ENABLED: z.coerce.boolean().default(true),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   LOG_FORMAT: z.enum(["pretty", "json"]).optional(),

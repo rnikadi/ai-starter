@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import process from "node:process";
+import { appConfig } from "@/lib/app-config";
 
 export async function GET() {
   const memory = process.memoryUsage();
   return NextResponse.json({
     status: "healthy",
-    service: "ai-starter-frontend",
+    service: `${appConfig.packageName}-frontend`,
     uptimeSeconds: Math.round(process.uptime() * 10) / 10,
     timestamp: new Date().toISOString(),
     node: process.version,

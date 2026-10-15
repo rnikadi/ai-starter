@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { appConfig } from "@/lib/app-config";
 
 interface AdminConsoleProps {
   user?: {
@@ -323,13 +324,13 @@ export function AdminConsole({
             <div className="admin-panel-card">
               <h2>Platform Settings</h2>
               <p className="muted">
-                Environment and service configuration details for the starter kit.
+                Environment and service configuration details.
               </p>
 
               <div className="admin-info-box">
                 <div className="admin-info-row">
                   <span className="admin-info-key">Application</span>
-                  <span className="admin-info-val">AI Application Starter</span>
+                  <span className="admin-info-val">{appConfig.displayName}</span>
                 </div>
                 <div className="admin-info-row">
                   <span className="admin-info-key">Authentication Provider</span>

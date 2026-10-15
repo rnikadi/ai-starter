@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-PACKAGE_NAME="$(node -p 'require("./package.json").name' 2>/dev/null || echo "ai-starter")"
+PACKAGE_NAME="$(node -p 'require("./package.json").name')"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$PACKAGE_NAME}"
 REALM="ai-starter"
 KEYCLOAK_URL="http://localhost:8080"

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
+import { appConfig } from "@/lib/app-config";
 
 interface Conversation {
   id: string;
@@ -32,8 +33,8 @@ const STARTER_PROMPTS = [
     subtitle: "Validate connection to the Archestra LLM gateway",
   },
   {
-    title: "Starter Architecture",
-    prompt: "Explain the architecture of this AI starter kit: Next.js, FastAPI/Node backend, Keycloak, Archestra, and PostgreSQL.",
+    title: "System Architecture",
+    prompt: `Explain the architecture of ${appConfig.displayName}: Next.js, Node backend, Keycloak, Archestra, and PostgreSQL with pgvector.`,
     subtitle: "High-level overview of services and security boundaries",
   },
   {
@@ -660,7 +661,7 @@ export function ConversationWorkspace({
                 placeholder={
                   isViewer
                     ? "Viewer role is read-only (prompt execution disabled)..."
-                    : "Message AI Starter..."
+                    : `Message ${appConfig.displayName}...`
                 }
                 value={prompt}
                 onChange={(e) => {
